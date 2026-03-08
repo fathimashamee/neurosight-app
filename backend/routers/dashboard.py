@@ -7,6 +7,7 @@ from backend.db.database import get_db
 from backend.core.config import settings
 from backend.models.user import User
 from backend.models.result import Result
+from backend.routers import auth, results, patients, dashboard
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"]) 
 
