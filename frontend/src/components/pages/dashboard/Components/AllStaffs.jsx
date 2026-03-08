@@ -57,7 +57,7 @@ export default function AllStaffs() {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200">
             <div className="p-4 border-b border-gray-200 flex justify-between items-center">
                 <h2 className="text-lg font-semibold text-gray-800">All Staffs</h2>
-                <button className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition">
+                <button onClick={() => window.location.href = '/staff/new'} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition">
                     + Add New Staff
                 </button>
             </div>
@@ -102,10 +102,17 @@ export default function AllStaffs() {
                                         </span>
                                     </td>
                                     <td className="p-3 flex justify-center gap-2">
-                                        {/* Toggle Switch Placeholder */}
-                                        <div className="relative inline-block w-8 h-4 align-middle select-none transition duration-200 ease-in">
-                                            <input type="checkbox" name="toggle" id={`toggle-${staff.id}`} className="toggle-checkbox absolute block w-4 h-4 rounded-full bg-white border-4 appearance-none cursor-pointer checked:right-0 checked:border-green-400" />
-                                            <label htmlFor={`toggle-${staff.id}`} className="toggle-label block overflow-hidden h-4 rounded-full bg-gray-300 cursor-pointer"></label>
+                                        {/* Status Toggle */}
+                                        <div className="relative inline-block w-8 h-4 align-middle select-none transition duration-200 ease-in mt-1 mr-2">
+                                            <input
+                                                type="checkbox"
+                                                name="toggle"
+                                                id={`toggle-${staff.id}`}
+                                                checked={staff.status}
+                                                onChange={() => handleSaveUser({ id: staff.id, status: !staff.status })}
+                                                className="toggle-checkbox absolute block w-4 h-4 rounded-full bg-white border-4 appearance-none cursor-pointer checked:right-0 checked:border-green-400"
+                                            />
+                                            <label htmlFor={`toggle-${staff.id}`} className={`toggle-label block overflow-hidden h-4 rounded-full cursor-pointer ${staff.status ? 'bg-green-400' : 'bg-gray-300'}`}></label>
                                         </div>
 
                                         <button className="text-blue-500 hover:text-blue-700" onClick={() => handleEdit(staff)}>✏️</button>

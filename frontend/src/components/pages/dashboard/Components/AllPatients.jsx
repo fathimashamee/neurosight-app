@@ -12,65 +12,38 @@
 
 //============================================================================================
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { api } from "../../../../util";
 
 const AllPatients = () => {
   // SIMULATION: Toggle between 'Attendant' and 'Doctor' to test permissions
   const [currentUser] = useState({ role: "Attendant", name: "Staff Member" });
 
-  const [patients] = useState([
-    {
-      hospitalId: "NS-20491",
-      name: "Evelyn Harper",
-      joinedDate: "2025-01-02",
-      dischargeDate: "2025-01-05",
-      tumourType: "Meningioma",
-      riskScore: "94.2%", 
-      age: "52", // Added Age
-      gender: "Female",
-      phone: "+1 555-0192",
-      email: "evelyn@example.com",
-      address: "123 Medical Lane, Health City", // Added Address
-      symptoms: "Persistent headaches localized in the frontal lobe, accompanied by nausea and morning dizziness for 2 weeks.", 
-      doctorNotes: "Scheduled for follow-up biopsy.",
-      mriImage: "https://via.placeholder.com/150", 
-      scanReport: "report_001.pdf"
-    },
-    {
-      hospitalId: "NS-17382",
-      name: "Rahul Singh",
-      joinedDate: "2025-01-03",
-      dischargeDate: "Pending",
-      tumourType: "No Tumour",
-      riskScore: "0.2%", 
-      age: "29", // Added Age
-      gender: "Male",
-      phone: "+1 555-0188",
-      email: "rahul@example.com",
-      address: "45 Station Road, Colombo", // Added Address
-      symptoms: "General dizziness and occasional blurred vision after reading. No physical pain reported.", 
-      doctorNotes: "No abnormalities found in frontal lobe.",
-      mriImage: "https://via.placeholder.com/150",
-      scanReport: "report_002.pdf"
-    },
-    {
-      hospitalId: "NS-23918",
-      name: "Ava Patel",
-      joinedDate: "2025-01-01",
-      dischargeDate: "2025-01-04",
-      tumourType: "Glioma",
-      riskScore: "88.7%", 
-      age: "41", // Added Age
-      gender: "Female",
-      phone: "+1 555-0123",
-      email: "ava@example.com",
-      address: "88 Orchid Avenue, Kandy", // Added Address
-      symptoms: "Blurred vision and sudden sharp pains in the temporal region during light exposure.", 
-      doctorNotes: "Urgent MRI review required.",
-      mriImage: "https://via.placeholder.com/150",
-      scanReport: "report_003.pdf"
+  const [patients, setPatients] = useState([]);
+
+  useEffect(() => {
+    fetchPatients();
+  }, []);
+
+  const fetchPatients = async () => {
+    try {
+      const data = await api("/patients/");
+      // Map backend fields to frontend format
+      const mapped = data.map(p => ({
+        ...p,
+        hospitalId: p.hospital_id,
+        joinedDate: p.joined_date,
+        dischargeDate: p.discharge_date,
+        tumourType: p.tumour_type,
+        riskScore: p.risk_score,
+        doctorNotes: p.doctor_notes,
+        scanReport: p.scan_report
+      }));
+      setPatients(mapped);
+    } catch (err) {
+      console.error("Failed to fetch patients", err);
     }
-  ]);
+  };
 
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('All');
@@ -80,7 +53,7 @@ const AllPatients = () => {
   // Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState(null);
-  const [modalMode, setModalMode] = useState('view'); 
+  const [modalMode, setModalMode] = useState('view');
 
   // Logic for Printing ID Card
   const handlePrintCard = (p) => {
@@ -126,8 +99,8 @@ const AllPatients = () => {
   };
 
   const filteredPatients = patients.filter(p => {
-    const matchesSearch = p.hospitalId.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          p.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = p.hospitalId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesType = typeFilter === 'All' || p.tumourType === typeFilter;
     const matchesJoined = !filterJoinedDate || p.joinedDate === filterJoinedDate;
     const matchesDischarge = !filterDischargeDate || p.dischargeDate === filterDischargeDate;
@@ -140,9 +113,9 @@ const AllPatients = () => {
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-wrap gap-4 items-end">
         <div className="flex-1 min-w-[180px]">
           <label className="text-[10px] font-black text-slate-400 uppercase mb-1 block">Search Patient</label>
-          <input 
-            type="text" 
-            placeholder="ID or Name..." 
+          <input
+            type="text"
+            placeholder="ID or Name..."
             className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -166,7 +139,7 @@ const AllPatients = () => {
             <option value="No Tumour">No Tumour</option>
           </select>
         </div>
-        <button onClick={() => {setSearchTerm(''); setTypeFilter('All'); setFilterJoinedDate(''); setFilterDischargeDate('');}} className="bg-slate-100 text-slate-600 px-4 py-2 rounded-lg text-xs font-bold">Clear</button>
+        <button onClick={() => { setSearchTerm(''); setTypeFilter('All'); setFilterJoinedDate(''); setFilterDischargeDate(''); }} className="bg-slate-100 text-slate-600 px-4 py-2 rounded-lg text-xs font-bold">Clear</button>
       </div>
 
       {/* TABLE */}
@@ -209,7 +182,14 @@ const AllPatients = () => {
                       <button onClick={() => openModal(p, 'edit')} className="flex items-center gap-1 px-3 py-1.5 bg-slate-50 text-slate-600 rounded-lg hover:bg-slate-800 hover:text-white transition-all text-[11px] font-bold border border-slate-200">
                         <span>✏️</span> Edit
                       </button>
-                      <button className="flex items-center gap-1 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition-all text-[11px] font-bold border border-red-100">
+                      <button onClick={async () => {
+                        if (window.confirm('Are you sure you want to delete this patient?')) {
+                          try {
+                            await api(`/patients/${p.id}`, { method: 'DELETE' });
+                            fetchPatients();
+                          } catch (e) { alert('Failed to delete'); }
+                        }
+                      }} className="flex items-center gap-1 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition-all text-[11px] font-bold border border-red-100">
                         <span>🗑️</span> Delete
                       </button>
                     </div>
@@ -232,10 +212,10 @@ const AllPatients = () => {
                   {modalMode === 'view' ? 'Patient Medical File' : 'Update Patient Information'}
                 </h2>
                 {modalMode === 'view' && (
-                   <div className="flex gap-2">
-                      <button onClick={() => handlePrintCard(selectedPatient)} className="bg-slate-800 text-white text-[10px] font-bold px-3 py-1 rounded hover:bg-black uppercase">🖨️ Print Card</button>
-                      <button onClick={() => handleSendReport(selectedPatient)} disabled={sendLoading} className="bg-blue-600 text-white text-[10px] font-bold px-3 py-1 rounded hover:bg-blue-700 uppercase">{sendLoading ? "Sending..." : "📧 Send Report"}</button>
-                   </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => handlePrintCard(selectedPatient)} className="bg-slate-800 text-white text-[10px] font-bold px-3 py-1 rounded hover:bg-black uppercase">🖨️ Print Card</button>
+                    <button onClick={() => handleSendReport(selectedPatient)} disabled={sendLoading} className="bg-blue-600 text-white text-[10px] font-bold px-3 py-1 rounded hover:bg-blue-700 uppercase">{sendLoading ? "Sending..." : "📧 Send Report"}</button>
+                  </div>
                 )}
               </div>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 text-2xl">&times;</button>
@@ -259,27 +239,27 @@ const AllPatients = () => {
                   {/* INTEGRATED DATE FIELDS */}
                   <div>
                     <label className="text-[10px] font-bold text-indigo-600 uppercase">Joined Date (System)</label>
-                    <input 
-                      disabled={modalMode === 'view'} 
-                      type={modalMode === 'edit' ? 'date' : 'text'} 
-                      className="w-full border-b py-1 bg-indigo-50/20 text-slate-500 font-mono" 
-                      defaultValue={selectedPatient.joinedDate} 
+                    <input
+                      disabled={modalMode === 'view'}
+                      type={modalMode === 'edit' ? 'date' : 'text'}
+                      className="w-full border-b py-1 bg-indigo-50/20 text-slate-500 font-mono"
+                      defaultValue={selectedPatient.joinedDate}
                     />
                   </div>
                   <div>
                     <label className="text-[10px] font-bold text-slate-400 uppercase">Discharge Date</label>
                     <div className="relative">
-                      <input 
-                        disabled={modalMode === 'view'} 
+                      <input
+                        disabled={modalMode === 'view'}
                         id="dischargeInput"
                         type={modalMode === 'edit' ? 'date' : 'text'}
-                        className="w-full border-b py-1 outline-none focus:border-blue-500 disabled:bg-transparent" 
-                        defaultValue={selectedPatient.dischargeDate === 'Pending' && modalMode === 'view' ? 'Still In Hospital' : (selectedPatient.dischargeDate === 'Pending' ? '' : selectedPatient.dischargeDate)} 
+                        className="w-full border-b py-1 outline-none focus:border-blue-500 disabled:bg-transparent"
+                        defaultValue={selectedPatient.dischargeDate === 'Pending' && modalMode === 'view' ? 'Still In Hospital' : (selectedPatient.dischargeDate === 'Pending' ? '' : selectedPatient.dischargeDate)}
                       />
                       {modalMode === 'edit' && (
-                        <button 
-                          type="button" 
-                          onClick={() => {document.getElementById('dischargeInput').value = ''}} 
+                        <button
+                          type="button"
+                          onClick={() => { document.getElementById('dischargeInput').value = '' }}
                           className="text-[9px] font-black text-amber-600 uppercase mt-1 block hover:underline"
                         >
                           Reset to Pending
@@ -315,7 +295,7 @@ const AllPatients = () => {
                 </div>
 
                 <h3 className="text-xs font-black text-amber-600 uppercase tracking-widest border-b pb-1 mt-6">Symptoms & Patient History</h3>
-                <textarea 
+                <textarea
                   rows="4"
                   disabled={modalMode === 'view'}
                   className="w-full p-3 text-sm border border-amber-100 rounded-xl bg-amber-50/20 outline-none focus:ring-2 focus:ring-amber-300 disabled:text-slate-700"
@@ -345,22 +325,41 @@ const AllPatients = () => {
                 </div>
 
                 <h3 className="text-xs font-black text-emerald-600 uppercase tracking-widest mt-6 border-b pb-1">Doctor's Observations</h3>
-                <textarea 
+                <textarea
                   rows="10"
+                  id="doctorNotesInput"
                   disabled={modalMode === 'view' || currentUser.role !== 'Doctor'}
-                  className={`w-full p-3 text-sm border rounded-xl outline-none transition-all ${
-                    modalMode === 'edit' && currentUser.role === 'Doctor' 
-                    ? 'focus:ring-2 focus:ring-emerald-500 border-emerald-200' 
-                    : 'bg-slate-100 text-slate-500 cursor-not-allowed border-slate-200 italic'
-                  }`}
+                  className={`w-full p-3 text-sm border rounded-xl outline-none transition-all ${modalMode === 'edit' && currentUser.role === 'Doctor'
+                      ? 'focus:ring-2 focus:ring-emerald-500 border-emerald-200'
+                      : 'bg-slate-100 text-slate-500 cursor-not-allowed border-slate-200 italic'
+                    }`}
                   defaultValue={selectedPatient.doctorNotes}
                   placeholder={currentUser.role !== 'Doctor' ? "Editing restricted to medical staff only" : "Enter clinical findings..."}
                 />
-                
+
                 {modalMode === 'edit' && (
                   <div className="pt-4 flex gap-3">
                     <button onClick={() => setIsModalOpen(false)} className="flex-1 py-2 rounded-xl border font-bold text-slate-500 text-sm hover:bg-slate-50">Cancel</button>
-                    <button className="flex-1 py-2 rounded-xl bg-slate-900 text-white font-bold text-sm shadow-lg hover:bg-black uppercase tracking-widest">Save Record</button>
+                    <button onClick={async () => {
+                      try {
+                        const updatedData = { ...selectedPatient };
+
+                        // Pick values from doc
+                        updatedData.doctor_notes = document.getElementById('doctorNotesInput').value;
+                        const ddl = document.getElementById('dischargeInput').value;
+                        if (ddl) updatedData.discharge_date = ddl;
+
+                        await api(`/patients/${selectedPatient.id}`, {
+                          method: 'PUT',
+                          body: JSON.stringify(updatedData)
+                        });
+                        alert('Updated securely.');
+                        setIsModalOpen(false);
+                        fetchPatients();
+                      } catch (e) {
+                        alert('Update failed');
+                      }
+                    }} className="flex-1 py-2 rounded-xl bg-slate-900 text-white font-bold text-sm shadow-lg hover:bg-black uppercase tracking-widest">Save Record</button>
                   </div>
                 )}
               </div>

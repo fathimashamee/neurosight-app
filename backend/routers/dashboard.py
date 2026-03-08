@@ -8,6 +8,8 @@ from backend.db.database import get_db
 from backend.core.config import settings
 from backend.models.user import User
 from backend.models.result import Result
+from backend.models.patient import Patient
+from backend.models.audit_log import AuditLog
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"]) 
 
@@ -30,34 +32,42 @@ def summary(db: Session = Depends(get_db), user_id: int = Depends(get_user_id)):
     active_counts = db.query(User.role, func.count(Result.id)).join(User).filter(Result.created_at >= since).group_by(User.role).all()
     active_sessions_by_role = {role: count for role, count in active_counts}
 
+    # Medical breakdown
+    total_patients = db.query(Patient).count()
+    active_patients = db.query(Patient).filter(Patient.discharge_date == 'Pending').count()
+    total_scans = db.query(Result).count()
+    
+    tumour_counts = db.query(Patient.tumour_type, func.count(Patient.id)).group_by(Patient.tumour_type).all()
+    tumour_breakdown = {t_type: count for t_type, count in tumour_counts}
+
     return {
         "total_users": total_users_by_role,
         "active_sessions": active_sessions_by_role,
+        "total_patients": total_patients,
+        "active_patients": active_patients,
+        "total_scans": total_scans,
+        "tumour_breakdown": tumour_breakdown,
         "pending_approvals": 0, # Deprecated
     }
 
 
 @router.get("/audit-logs")
-def audit_logs(limit: int = 5, db: Session = Depends(get_db), user_id: int = Depends(get_user_id)):
-    logs = []
-    # Recent results
-    recent_results = db.query(Result).order_by(Result.created_at.desc()).limit(limit).all()
-    for r in recent_results:
-        user_email = getattr(r.user, "email", "unknown")
-        name = user_email.split("@")[0]
-        logs.append({
-            "message": f"{name} uploaded new MRI scan",
-            "timestamp": r.created_at.isoformat(),
-        })
-
-    # If not enough logs, include recent user registrations
-    if len(logs) < limit:
-        need = limit - len(logs)
-        recent_users = db.query(User).order_by(User.created_at.desc()).limit(need).all()
-        for u in recent_users:
-            logs.append({
-                "message": f"New user registered: {u.email}",
-                "timestamp": u.created_at.isoformat(),
-            })
-
-    return logs[:limit]
+def audit_logs(limit: int = 10, status: str = None, db: Session = Depends(get_db), user_id: int = Depends(get_user_id)):
+    query = db.query(AuditLog)
+    if status and status != "All":
+        query = query.filter(AuditLog.status == status)
+    
+    logs = query.order_by(AuditLog.timestamp.desc()).limit(limit).all()
+    
+    # Return in format frontend expects
+    return [{
+        "id": l.id,
+        "action": l.action,
+        "user": l.user,
+        "role": l.role,
+        "ip": l.ip,
+        "status": l.status,
+        "timestamp": l.timestamp.isoformat(),
+        "details": l.details,
+        "message": f"{l.user}: {l.action}" # Legacy support
+    } for l in logs]

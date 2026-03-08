@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Header
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Header, Request
 from sqlalchemy.orm import Session
 from pathlib import Path
 import shutil
@@ -10,6 +10,7 @@ from backend.models.user import User
 from backend.models.result import Result
 from backend.schemas.result import ResultRead
 from jose import jwt
+from backend.core.audit import log_event
 
 router = APIRouter(prefix="/results", tags=["results"])
 
@@ -21,7 +22,7 @@ def get_user_id(authorization: str | None = Header(default=None)) -> int:
     return int(payload.get("sub"))
 
 @router.post("/upload", response_model=ResultRead)
-def upload_scan(file: UploadFile = File(...), db: Session = Depends(get_db), user_id: int = Depends(get_user_id)):
+def upload_scan(request: Request, file: UploadFile = File(...), db: Session = Depends(get_db), user_id: int = Depends(get_user_id)):
     uploads = Path(settings.UPLOAD_DIR)
     uploads.mkdir(parents=True, exist_ok=True)
 
@@ -36,6 +37,10 @@ def upload_scan(file: UploadFile = File(...), db: Session = Depends(get_db), use
     # Persist result
     result = Result(user_id=user_id, filename=str(dst), predicted_label=label, confidence=conf)
     db.add(result); db.commit(); db.refresh(result)
+    
+    log_event(db, "MRI Upload", user_id=user_id, ip=request.client.host, details=f"Uploaded: {file.filename}")
+    log_event(db, "Model Inference", user_id=user_id, ip="localhost", details=f"Classification: {label} ({conf*100:.1f}% confidence)")
+    
     return result
 
 @router.get("/", response_model=list[ResultRead])

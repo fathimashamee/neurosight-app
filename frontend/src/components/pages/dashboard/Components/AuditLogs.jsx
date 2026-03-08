@@ -1,35 +1,37 @@
-import { useState, useMemo } from 'react';
-
-// Mock Data
-const MOCK_LOGS = [
-  { id: 1, action: "User Login", user: "Dr. Sarah Miller", role: "Clinician", ip: "192.168.1.45", status: "Success", timestamp: "2026-01-09T08:30:00", details: "Successful login via web portal" },
-  { id: 2, action: "MRI Upload", user: "Dr. Sarah Miller", role: "Clinician", ip: "192.168.1.45", status: "Success", timestamp: "2026-01-09T08:45:12", details: "Uploaded scan_patient_4022.dcm" },
-  { id: 3, action: "Model Inference", user: "System", role: "AI Engine", ip: "localhost", status: "Success", timestamp: "2026-01-09T08:45:15", details: "Classification: Glioma (98% confidence)" },
-  { id: 4, action: "Patient Record Created", user: "Admin User", role: "Admin", ip: "192.168.1.10", status: "Success", timestamp: "2026-01-09T09:12:00", details: "Created record for ID: PT-2024-089" },
-  { id: 5, action: "Failed Login Attempt", user: "unknown", role: "Unknown", ip: "45.2.10.99", status: "Failed", timestamp: "2026-01-09T09:20:05", details: "Invalid password for user: admin" },
-  { id: 6, action: "User Role Update", user: "Admin User", role: "Admin", ip: "192.168.1.10", status: "Warning", timestamp: "2026-01-09T10:00:00", details: "Elevated permissions for user: j.doe" },
-  { id: 7, action: "System Backup", user: "System", role: "System", ip: "localhost", status: "Success", timestamp: "2026-01-09T12:00:00", details: "Daily database backup completed (450MB)" },
-  { id: 8, action: "Report Download", user: "Dr. John Smith", role: "Neurologist", ip: "192.168.1.50", status: "Success", timestamp: "2026-01-09T13:15:30", details: "Downloaded report_PT-2024-055.pdf" },
-  { id: 9, action: "API Error", user: "System", role: "System", ip: "localhost", status: "Failed", timestamp: "2026-01-09T14:10:22", details: "Timeout connecting to notification service" },
-  { id: 10, action: "Logout", user: "Dr. Sarah Miller", role: "Clinician", ip: "192.168.1.45", status: "Success", timestamp: "2026-01-09T17:00:00", details: "User session terminated" },
-];
+import { useState, useMemo, useEffect } from 'react';
+import { api } from '../../../../util';
 
 export default function AuditLogs() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchLogs();
+  }, [statusFilter]);
+
+  const fetchLogs = async () => {
+    setLoading(true);
+    try {
+      const data = await api(`/dashboard/audit-logs?limit=50&status=${statusFilter}`);
+      setLogs(data);
+    } catch (err) {
+      console.error("Failed to fetch logs", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredLogs = useMemo(() => {
-    return MOCK_LOGS.filter(log => {
+    return logs.filter(log => {
       const matchesSearch =
         log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
         log.user.toLowerCase().includes(searchTerm.toLowerCase()) ||
         log.details.toLowerCase().includes(searchTerm.toLowerCase());
-
-      const matchesStatus = statusFilter === "All" || log.status === statusFilter;
-
-      return matchesSearch && matchesStatus;
+      return matchesSearch;
     });
-  }, [searchTerm, statusFilter]);
+  }, [searchTerm, logs]);
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -67,8 +69,8 @@ export default function AuditLogs() {
               key={status}
               onClick={() => setStatusFilter(status)}
               className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all border ${statusFilter === status
-                  ? "bg-slate-800 text-white border-slate-800"
-                  : "bg-white text-slate-500 border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                ? "bg-slate-800 text-white border-slate-800"
+                : "bg-white text-slate-500 border-slate-200 hover:border-slate-300 hover:bg-slate-50"
                 }`}
             >
               {status}
@@ -130,7 +132,7 @@ export default function AuditLogs() {
 
         {/* Pagination Footer (Static for now) */}
         <div className="p-4 border-t border-slate-200 bg-slate-50 flex justify-between items-center text-xs text-slate-500">
-          <span>Showing {filteredLogs.length} of {MOCK_LOGS.length} results</span>
+          <span>Showing {filteredLogs.length} of {logs.length} results</span>
           <div className="flex gap-1">
             <button disabled className="px-3 py-1 border rounded bg-white text-slate-300 cursor-not-allowed">Previous</button>
             <button className="px-3 py-1 border rounded bg-white hover:bg-slate-50 text-slate-600 font-medium">Next</button>

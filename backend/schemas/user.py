@@ -6,6 +6,7 @@ class UserCreate(BaseModel):
     name: str | None = None
     role: str = "Clinician"
     mobile: str | None = None
+    status: bool = True
 
 class UserRead(BaseModel):
     id: int
