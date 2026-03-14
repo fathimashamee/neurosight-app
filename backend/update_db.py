@@ -1,15 +1,42 @@
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.exc import ProgrammingError
 from backend.core.config import settings
+
+
+def _is_duplicate_column_error(exc: ProgrammingError) -> bool:
+    # PostgreSQL duplicate_column
+    pgcode = getattr(getattr(exc, "orig", None), "pgcode", None)
+    if pgcode == "42701":
+        return True
+
+    # Fallback for other drivers.
+    msg = str(exc).lower()
+    return "duplicate column" in msg or "already exists" in msg
 
 def update_db():
     engine = create_engine(settings.DATABASE_URL)
-    with engine.connect() as conn:
-        try:
-            conn.execute(text("ALTER TABLE users ADD COLUMN status BOOLEAN DEFAULT TRUE"))
-            conn.commit()
-            print("Added 'status' column to users table")
-        except Exception as e:
-            print(f"Error (column might already exist): {e}")
+    with engine.begin() as conn:
+        existing_columns = {col["name"] for col in inspect(conn).get_columns("users")}
+        columns_to_add = [
+            ("status", "BOOLEAN DEFAULT TRUE"),
+            ("password_reset_token_hash", "VARCHAR(255)"),
+            ("password_reset_token_expires_at", "TIMESTAMP WITH TIME ZONE"),
+        ]
+
+        for column_name, column_ddl in columns_to_add:
+            if column_name in existing_columns:
+                print(f"'{column_name}' column already exists on users table")
+                continue
+
+            try:
+                conn.execute(text(f"ALTER TABLE users ADD COLUMN {column_name} {column_ddl}"))
+                print(f"Added '{column_name}' column to users table")
+            except ProgrammingError as e:
+                # If another process adds it between check and ALTER, suppress only that case.
+                if _is_duplicate_column_error(e):
+                    print(f"'{column_name}' column already exists on users table")
+                else:
+                    raise
 
 if __name__ == "__main__":
     update_db()

@@ -87,7 +87,7 @@ const AddNewPatient = ({ onPatientAdded, lastPatientId = "NS-00000" }) => {
     try {
       await api("/patients/", {
         method: "POST",
-        body: JSON.stringify(finalData)
+        body: finalData
       });
       alert("Patient added successfully!");
       if (onPatientAdded) onPatientAdded(finalData);

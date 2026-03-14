@@ -1,30 +1,48 @@
 import smtplib
+import secrets
+from datetime import datetime, timedelta, timezone
+import hashlib
+import logging
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from sqlalchemy.orm import Session
 from backend.core.config import settings
+from backend.models.user import User
 
-def send_welcome_email(to_email: str, user_id: int, password: str):
+
+logger = logging.getLogger(__name__)
+
+
+def _hash_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def create_password_reset_token(db: Session, user: User, expires_minutes: int = 60) -> str:
+    token = secrets.token_urlsafe(32)
+    user.password_reset_token_hash = _hash_token(token)
+    user.password_reset_token_expires_at = datetime.now(timezone.utc) + timedelta(minutes=expires_minutes)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return token
+
+
+def get_user_by_password_reset_token(db: Session, token: str) -> User | None:
+    hashed = _hash_token(token)
+    user = db.query(User).filter(User.password_reset_token_hash == hashed).first()
+    if not user:
+        return None
+    if not user.password_reset_token_expires_at:
+        return None
+    if user.password_reset_token_expires_at < datetime.now(timezone.utc):
+        return None
+    return user
+
+
+def send_email(to_email: str, subject: str, html_content: str):
     if not settings.SMTP_HOST or not settings.SMTP_USER:
-        print(f"SMTP not configured. Skipping email to {to_email}")
-        print(f"Credentials - User ID: {user_id}, Password: {password}")
+        logger.warning("SMTP not configured; skipping email delivery to recipient=%s", to_email)
         return
-
-    subject = "Welcome to NeuroSight - Your Login Credentials"
-    login_url = f"{settings.CORS_ORIGINS}/"
-    
-    html_content = f"""
-    <html>
-        <body>
-            <h2>Welcome to NeuroSight!</h2>
-            <p>Your account has been created successfully.</p>
-            <p><strong>User ID:</strong> {user_id}</p>
-            <p><strong>Password:</strong> {password}</p>
-            <p>Please login at: <a href="{login_url}">{login_url}</a></p>
-            <br>
-            <p>Best regards,<br>NeuroSight Team</p>
-        </body>
-    </html>
-    """
 
     msg = MIMEMultipart()
     msg["From"] = settings.EMAILS_FROM_EMAIL
@@ -32,11 +50,32 @@ def send_welcome_email(to_email: str, user_id: int, password: str):
     msg["Subject"] = subject
     msg.attach(MIMEText(html_content, "html"))
 
+    with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
+        server.starttls()
+        server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+        server.send_message(msg)
+
+
+def send_welcome_email(to_email: str, user_id: int, activation_url: str):
+    subject = "Welcome to NeuroSight - Set Your Password"
+
+    html_content = f"""
+    <html>
+        <body>
+            <h2>Welcome to NeuroSight!</h2>
+            <p>Your account has been created successfully.</p>
+            <p><strong>User ID:</strong> {user_id}</p>
+            <p>To activate your account, set your password using this secure one-time link:</p>
+            <p><a href="{activation_url}">{activation_url}</a></p>
+            <p>This link expires in 60 minutes.</p>
+            <br>
+            <p>Best regards,<br>NeuroSight Team</p>
+        </body>
+    </html>
+    """
+
     try:
-        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
-            server.starttls()
-            server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-            server.send_message(msg)
-            print(f"Welcome email sent to {to_email}")
+        send_email(to_email, subject, html_content)
+        logger.info("Welcome email dispatched to recipient=%s", to_email)
     except Exception as e:
-        print(f"Failed to send email: {e}")
+        logger.warning("Failed to send welcome email to recipient=%s: %s", to_email, e)

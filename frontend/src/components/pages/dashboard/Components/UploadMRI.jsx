@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { api, getToken } from "../../../../util";
+import { api } from "../../../../util";
 import { useNavigate } from "react-router-dom";
 
 export default function UploadMRI() {
@@ -28,19 +28,11 @@ export default function UploadMRI() {
     formData.append("file", file);
 
     try {
-      const response = await fetch("http://localhost:8000/results/upload", {
+      const data = await api("/results/upload", {
         method: "POST",
-        headers: {
-          "Authorization": `Bearer ${getToken()}`
-        },
-        body: formData
+        body: formData,
+        isForm: true,
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.detail || "Upload failed");
-      }
 
       setResult(data);
       // alert("Scan uploaded and analyzed successfully!");

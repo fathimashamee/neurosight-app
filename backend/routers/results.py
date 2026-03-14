@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Header,
 from sqlalchemy.orm import Session
 from pathlib import Path
 import shutil
+import logging
 
 from backend.db.database import get_db
 from backend.core.config import settings
@@ -13,6 +14,7 @@ from jose import jwt
 from backend.core.audit import log_event
 
 router = APIRouter(prefix="/results", tags=["results"])
+logger = logging.getLogger(__name__)
 
 def get_user_id(authorization: str | None = Header(default=None)) -> int:
     if not authorization or not authorization.lower().startswith("bearer "):
@@ -27,7 +29,10 @@ def upload_scan(request: Request, file: UploadFile = File(...), db: Session = De
     uploads.mkdir(parents=True, exist_ok=True)
 
     # Save file
-    dst = uploads / file.filename
+    safe_name = Path(file.filename or "").name
+    if not safe_name:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    dst = uploads / safe_name
     with dst.open("wb") as f:
         shutil.copyfileobj(file.file, f)
 
@@ -37,9 +42,13 @@ def upload_scan(request: Request, file: UploadFile = File(...), db: Session = De
     # Persist result
     result = Result(user_id=user_id, filename=str(dst), predicted_label=label, confidence=conf)
     db.add(result); db.commit(); db.refresh(result)
-    
-    log_event(db, "MRI Upload", user_id=user_id, ip=request.client.host, details=f"Uploaded: {file.filename}")
-    log_event(db, "Model Inference", user_id=user_id, ip="localhost", details=f"Classification: {label} ({conf*100:.1f}% confidence)")
+
+    ip = request.client.host if request.client else "unknown"
+    try:
+        log_event(db, "MRI Upload", user_id=user_id, ip=ip, details=f"Uploaded: {file.filename}")
+        log_event(db, "Model Inference", user_id=user_id, ip=ip, details=f"Classification: {label} ({conf*100:.1f}% confidence)")
+    except Exception as e:
+        logger.warning("Audit log write failed in results upload: %s", e)
     
     return result
 

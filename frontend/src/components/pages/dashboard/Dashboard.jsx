@@ -99,13 +99,17 @@ export default function Dashboard() {
       })
       .catch((err) => {
         console.error("Failed to fetch user:", err);
+        setUser(null);
+        removeToken();
+        navigate("/", { replace: true });
       });
-  }, []);
+  }, [navigate]);
 
   const handleLogout = () => {
     if (window.confirm("Are you sure you want to logout?")) {
+      setUser(null);
       removeToken();
-      window.location.href = "/";
+      navigate("/", { replace: true });
     }
   };
 

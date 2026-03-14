@@ -21,6 +21,15 @@ def get_user_id(authorization: str | None = Header(default=None)) -> int:
     return int(payload.get("sub"))
 
 
+def require_admin(db: Session, user_id: int) -> User:
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+    if user.role != "Admin":
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    return user
+
+
 @router.get("/summary")
 def summary(db: Session = Depends(get_db), user_id: int = Depends(get_user_id)):
     # Total users breakdown
@@ -53,6 +62,8 @@ def summary(db: Session = Depends(get_db), user_id: int = Depends(get_user_id)):
 
 @router.get("/audit-logs")
 def audit_logs(limit: int = 10, status: str = None, db: Session = Depends(get_db), user_id: int = Depends(get_user_id)):
+    require_admin(db, user_id)
+
     query = db.query(AuditLog)
     if status and status != "All":
         query = query.filter(AuditLog.status == status)
@@ -71,3 +82,11 @@ def audit_logs(limit: int = 10, status: str = None, db: Session = Depends(get_db
         "details": l.details,
         "message": f"{l.user}: {l.action}" # Legacy support
     } for l in logs]
+
+
+@router.get("/user-roles")
+def user_roles(db: Session = Depends(get_db), user_id: int = Depends(get_user_id)):
+    require_admin(db, user_id)
+
+    role_counts = db.query(User.role, func.count(User.id)).group_by(User.role).all()
+    return [{"role": role, "count": count} for role, count in role_counts]

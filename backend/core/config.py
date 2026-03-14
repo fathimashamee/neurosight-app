@@ -2,8 +2,10 @@ from pydantic_settings import BaseSettings
 
 from pathlib import Path
 
+DATABASE_URL_PLACEHOLDER = "postgresql+psycopg2://user:password@localhost:5432/dbname"
+
 class Settings(BaseSettings):
-    DATABASE_URL: str = "postgresql+psycopg2://postgres:4545@localhost:5432/brain_tumor"
+    DATABASE_URL: str = DATABASE_URL_PLACEHOLDER
     SECRET_KEY: str = "CHANGE_ME"              # use a strong random string
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
@@ -20,4 +22,19 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
 
+    def model_post_init(self, __context):
+        if not self.DATABASE_URL or self.DATABASE_URL == DATABASE_URL_PLACEHOLDER:
+            raise ValueError("DATABASE_URL must be provided via environment and cannot use the placeholder value.")
+
 settings = Settings()
+
+
+def _parse_cors_origins(value: str | list[str] | None) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [origin.strip() for origin in value.split(",") if origin.strip()]
+    return [origin.strip() for origin in value if origin and origin.strip()]
+
+
+CORS_ORIGINS = _parse_cors_origins(settings.CORS_ORIGINS)

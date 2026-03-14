@@ -16,7 +16,7 @@ export async function api(path, { method = "GET", body, isForm = false } = {}) {
     body: isForm ? body : body ? JSON.stringify(body) : undefined
   });
   if (!res.ok) throw new Error(await res.text());
-  if (res.status === 204) return null;
+  if (res.status === 204) return {};
   const text = await res.text();
   return text ? JSON.parse(text) : {};
 }

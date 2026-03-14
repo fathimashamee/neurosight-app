@@ -11,6 +11,8 @@ class User(Base):
     mobile = Column(String(20), nullable=True)
     status = Column(Boolean, default=True)
     password_hash = Column(String(255), nullable=False)
+    password_reset_token_hash = Column(String(255), nullable=True)
+    password_reset_token_expires_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     results = relationship("Result", back_populates="user")

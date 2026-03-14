@@ -27,6 +27,8 @@ def create_patient(body: PatientCreate, request: Request, db: Session = Depends(
     if db_patient:
         raise HTTPException(status_code=400, detail="Patient with this Hospital ID already exists")
 
+    new_patient = Patient(**body.model_dump())
+
     db.add(new_patient)
     db.commit()
     db.refresh(new_patient)
@@ -68,8 +70,9 @@ def delete_patient(id: int, request: Request, db: Session = Depends(get_db), use
     patient = db.query(Patient).filter(Patient.id == id).first()
     if not patient:
         raise HTTPException(status_code=404, detail="Patient not found")
-        
-    log_event(db, "Patient Record Deleted", user_id=user_id, ip=request.client.host, details=f"Deleted ID: {patient.hospital_id}")
+
+    deleted_hospital_id = patient.hospital_id
     db.delete(patient)
     db.commit()
+    log_event(db, "Patient Record Deleted", user_id=user_id, ip=request.client.host, details=f"Deleted ID: {deleted_hospital_id}")
     return None

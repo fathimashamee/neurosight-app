@@ -4,7 +4,6 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: str
     name: str | None = None
-    role: str = "Clinician"
     mobile: str | None = None
     status: bool = True
 

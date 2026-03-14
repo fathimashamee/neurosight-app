@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import { api } from '../../../../util';
 
 export default function DashboardHome() {
   const [summary, setSummary] = useState(null);
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { user } = useOutletContext();
+  const isAdmin = user?.role === 'Admin';
 
   useEffect(() => {
     let mounted = true;
@@ -53,7 +56,7 @@ export default function DashboardHome() {
         <div className="bg-white p-6 rounded-xl shadow-sm hover:shadow-md transition-transform transform hover:-translate-y-0.5 border border-gray-100 flex flex-col justify-between">
           <div>
             <div className="flex justify-between items-center mb-4">
-              <div className="text-sm font-medium text-gray-500">Active Sessions</div>
+              <div className="text-sm font-medium text-gray-500">Recent uploads (24h)</div>
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
@@ -65,12 +68,14 @@ export default function DashboardHome() {
                 <div className="text-3xl font-extrabold text-gray-900">
                   {summary?.active_sessions ? Object.values(summary.active_sessions).reduce((sum, count) => sum + count, 0) : 0}
                 </div>
-                <div className="text-xs text-gray-500 mt-1">Currently logged-in users</div>
+                <div className="text-xs text-gray-500 mt-1">Results uploaded in the last 24 hours</div>
               </div>
             )}
           </div>
           <div className="mt-6">
-            <button className="w-full bg-[#2563eb] text-white px-4 py-2.5 rounded-md text-sm font-semibold hover:bg-blue-700 transition" onClick={() => window.location.href = '/system/audit-logs'}>View Details</button>
+            {isAdmin && (
+              <button className="w-full bg-[#2563eb] text-white px-4 py-2.5 rounded-md text-sm font-semibold hover:bg-blue-700 transition" onClick={() => window.location.href = '/system/audit-logs'}>View Details</button>
+            )}
           </div>
         </div>
       </div>
@@ -142,9 +147,13 @@ export default function DashboardHome() {
             <h4 className="font-semibold text-gray-700 uppercase tracking-widest text-sm mb-4">Admin Tools</h4>
             <div className="grid grid-cols-2 gap-3 mt-4">
               <button className="p-3 rounded-md border hover:shadow text-left text-sm text-gray-700 hover:bg-gray-50 transition font-bold" onClick={() => window.location.href = '/staff'}>Manage Users</button>
-              <button className="p-3 rounded-md border hover:shadow text-left text-sm text-gray-700 hover:bg-gray-50 transition font-bold" onClick={() => window.location.href = '/system/user-roles'}>User Roles</button>
+              {isAdmin && (
+                <button className="p-3 rounded-md border hover:shadow text-left text-sm text-gray-700 hover:bg-gray-50 transition font-bold" onClick={() => window.location.href = '/system/user-roles'}>User Roles</button>
+              )}
               <button className="p-3 rounded-md border hover:shadow text-left text-sm text-gray-700 hover:bg-gray-50 transition font-bold" onClick={() => window.location.href = '/reports/history'}>Report History</button>
-              <button className="p-3 rounded-md border hover:shadow text-left text-sm text-gray-700 hover:bg-gray-50 transition font-bold" onClick={() => window.location.href = '/system/audit-logs'}>Monitor Logs</button>
+              {isAdmin && (
+                <button className="p-3 rounded-md border hover:shadow text-left text-sm text-gray-700 hover:bg-gray-50 transition font-bold" onClick={() => window.location.href = '/system/audit-logs'}>Monitor Logs</button>
+              )}
             </div>
           </div>
 

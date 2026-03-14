@@ -54,6 +54,8 @@ const AllPatients = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [modalMode, setModalMode] = useState('view');
+  const [editedNotes, setEditedNotes] = useState('');
+  const [editedDischargeDate, setEditedDischargeDate] = useState('');
 
   // Logic for Printing ID Card
   const handlePrintCard = (p) => {
@@ -95,6 +97,8 @@ const AllPatients = () => {
   const openModal = (patient, mode) => {
     setSelectedPatient(patient);
     setModalMode(mode);
+    setEditedNotes(patient.doctorNotes || '');
+    setEditedDischargeDate(patient.dischargeDate === 'Pending' ? '' : (patient.dischargeDate || ''));
     setIsModalOpen(true);
   };
 
@@ -158,8 +162,8 @@ const AllPatients = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50 text-sm font-medium">
-              {filteredPatients.map((p, index) => (
-                <tr key={index} className="hover:bg-slate-50/80 transition-colors">
+              {filteredPatients.map((p) => (
+                <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
                   <td className="p-4 font-mono text-blue-600 font-bold">{p.hospitalId}</td>
                   <td className="p-4 text-slate-800">{p.name}</td>
                   <td className="p-4 text-slate-500 font-mono text-xs">{p.joinedDate}</td>
@@ -251,15 +255,15 @@ const AllPatients = () => {
                     <div className="relative">
                       <input
                         disabled={modalMode === 'view'}
-                        id="dischargeInput"
                         type={modalMode === 'edit' ? 'date' : 'text'}
                         className="w-full border-b py-1 outline-none focus:border-blue-500 disabled:bg-transparent"
-                        defaultValue={selectedPatient.dischargeDate === 'Pending' && modalMode === 'view' ? 'Still In Hospital' : (selectedPatient.dischargeDate === 'Pending' ? '' : selectedPatient.dischargeDate)}
+                        value={modalMode === 'view' ? (selectedPatient.dischargeDate === 'Pending' ? 'Still In Hospital' : selectedPatient.dischargeDate) : editedDischargeDate}
+                        onChange={(e) => setEditedDischargeDate(e.target.value)}
                       />
                       {modalMode === 'edit' && (
                         <button
                           type="button"
-                          onClick={() => { document.getElementById('dischargeInput').value = '' }}
+                          onClick={() => setEditedDischargeDate('')}
                           className="text-[9px] font-black text-amber-600 uppercase mt-1 block hover:underline"
                         >
                           Reset to Pending
@@ -327,13 +331,13 @@ const AllPatients = () => {
                 <h3 className="text-xs font-black text-emerald-600 uppercase tracking-widest mt-6 border-b pb-1">Doctor's Observations</h3>
                 <textarea
                   rows="10"
-                  id="doctorNotesInput"
                   disabled={modalMode === 'view' || currentUser.role !== 'Doctor'}
                   className={`w-full p-3 text-sm border rounded-xl outline-none transition-all ${modalMode === 'edit' && currentUser.role === 'Doctor'
                       ? 'focus:ring-2 focus:ring-emerald-500 border-emerald-200'
                       : 'bg-slate-100 text-slate-500 cursor-not-allowed border-slate-200 italic'
                     }`}
-                  defaultValue={selectedPatient.doctorNotes}
+                  value={editedNotes}
+                  onChange={(e) => setEditedNotes(e.target.value)}
                   placeholder={currentUser.role !== 'Doctor' ? "Editing restricted to medical staff only" : "Enter clinical findings..."}
                 />
 
@@ -342,12 +346,11 @@ const AllPatients = () => {
                     <button onClick={() => setIsModalOpen(false)} className="flex-1 py-2 rounded-xl border font-bold text-slate-500 text-sm hover:bg-slate-50">Cancel</button>
                     <button onClick={async () => {
                       try {
-                        const updatedData = { ...selectedPatient };
-
-                        // Pick values from doc
-                        updatedData.doctor_notes = document.getElementById('doctorNotesInput').value;
-                        const ddl = document.getElementById('dischargeInput').value;
-                        if (ddl) updatedData.discharge_date = ddl;
+                        const updatedData = {
+                          ...selectedPatient,
+                          doctor_notes: editedNotes,
+                          discharge_date: editedDischargeDate || 'Pending'
+                        };
 
                         await api(`/patients/${selectedPatient.id}`, {
                           method: 'PUT',
