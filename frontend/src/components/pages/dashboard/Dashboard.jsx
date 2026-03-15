@@ -86,7 +86,7 @@ function Sidebar({ collapsed, role, onLogout }) {
   );
 }
 
-export default function Dashboard() {
+export default function Dashboard({ onLogout }) {
   const [collapsed, setCollapsed] = useState(false);
   const [user, setUser] = useState(null);
   const navigate = useNavigate();
@@ -101,15 +101,17 @@ export default function Dashboard() {
         console.error("Failed to fetch user:", err);
         setUser(null);
         removeToken();
-        navigate("/", { replace: true });
+        onLogout?.();
+        navigate("/login", { replace: true });
       });
-  }, [navigate]);
+  }, [navigate, onLogout]);
 
   const handleLogout = () => {
     if (window.confirm("Are you sure you want to logout?")) {
       setUser(null);
       removeToken();
-      navigate("/", { replace: true });
+      onLogout?.();
+      navigate("/login", { replace: true });
     }
   };
 

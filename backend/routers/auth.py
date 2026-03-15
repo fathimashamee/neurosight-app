@@ -11,7 +11,7 @@ from jose import JWTError, jwt as jose_jwt
 from backend.db.database import get_db
 from backend.core.config import settings
 from backend.models.user import User
-from backend.schemas.user import UserCreate, UserRead, UserUpdate, Token
+from backend.schemas.user import UserCreate, UserLogin, UserRead, UserSignup, UserUpdate, Token
 from backend.core.email_utils import create_password_reset_token, get_user_by_password_reset_token, send_welcome_email
 from backend.core.audit import log_event
 
@@ -77,6 +77,29 @@ def create_access_token(sub: str):
     to_encode = {"sub": sub, "exp": datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)}
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
+
+@router.post("/signup", response_model=Token)
+def signup(body: UserSignup, request: Request, db: Session = Depends(get_db)):
+    if db.query(User).filter(User.email == body.email).first():
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    user = User(
+        email=body.email,
+        password_hash=pwd_ctx.hash(body.password),
+        name=body.name,
+        role="Clinician",
+        mobile=body.mobile,
+        status=True,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    ip = request.client.host if request.client else "unknown"
+    log_event(db, "User Signup", user_id=user.id, ip=ip, details=f"Self-registered account: {user.email}")
+
+    return Token(access_token=create_access_token(str(user.id)))
+
 @router.post("/register", response_model=UserRead)
 def register(
     body: UserCreate,
@@ -110,7 +133,7 @@ def register(
     return user
 
 @router.post("/login", response_model=Token)
-def login(body: UserCreate, request: Request, db: Session = Depends(get_db)):
+def login(body: UserLogin, request: Request, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == body.email).first()
     if not user or not pwd_ctx.verify(body.password, user.password_hash):
         log_event(db, "Failed Login Attempt", ip=request.client.host, status="Failed", details=f"Invalid attempt for: {body.email}")

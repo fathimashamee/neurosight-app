@@ -7,6 +7,16 @@ class UserCreate(BaseModel):
     mobile: str | None = None
     status: bool = True
 
+class UserSignup(BaseModel):
+    email: EmailStr
+    password: str
+    name: str
+    mobile: str | None = None
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
 class UserRead(BaseModel):
     id: int
     email: EmailStr

@@ -18,6 +18,9 @@ def update_db():
     with engine.begin() as conn:
         existing_columns = {col["name"] for col in inspect(conn).get_columns("users")}
         columns_to_add = [
+            ("name", "VARCHAR(255)"),
+            ("role", "VARCHAR(50) DEFAULT 'Clinician'"),
+            ("mobile", "VARCHAR(20)"),
             ("status", "BOOLEAN DEFAULT TRUE"),
             ("password_reset_token_hash", "VARCHAR(255)"),
             ("password_reset_token_expires_at", "TIMESTAMP WITH TIME ZONE"),
