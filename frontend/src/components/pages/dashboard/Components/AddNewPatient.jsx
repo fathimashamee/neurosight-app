@@ -672,6 +672,11 @@ fetchLatestId()
     }
   };
 
+  const runOCR = () => {
+    const fileInput = document.getElementById("patient-ocr-file");
+    fileInput?.click();
+  };
+
   // --- REAL AI OCR API CALL ---
   const processOcrFile = async (file) => {
     if (!file) return;
@@ -793,6 +798,7 @@ const handleSubmit = async (e) => {
             
             {/* The hidden input overlay that captures clicks (Shameeha's validation) */}
             <input 
+              id="patient-ocr-file"
               type="file" 
               accept="image/*,application/pdf"
               onChange={handleFileInput} 
