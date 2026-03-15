@@ -18,3 +18,10 @@ backend/uploads/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Environment files
+.env
+backend/.env
+**/.env
+!.env.example
+!**/.env.example

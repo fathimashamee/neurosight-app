@@ -96,7 +96,16 @@ Documentation: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
    ```bash
    pip install --no-cache-dir -r requirements.txt
    ```
-5. Start the backend server:
+5. Configure backend environment variables:
+
+   Use [backend/.env.example](backend/.env.example) as a template and set real values locally (or via deployment environment variables). Do not commit real secrets.
+
+   ```bash
+   copy backend\.env.example backend\.env
+   ```
+
+   Then edit `backend/.env` and set real `DATABASE_URL` and `SECRET_KEY` values.
+6. Start the backend server:
 
    ```bash
    cd ..
@@ -131,8 +140,11 @@ Documentation: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 Run this command inside the backend folder (with `.venv` activated):
 
 ```bash
+set TEST_DATABASE_URL=postgresql+psycopg2://<user>:<password>@<host>:5432/<dbname>
 python test_db.py
 ```
+
+Do not commit database credentials. In CI, set `TEST_DATABASE_URL` in your secret store/environment variables.
 
 If the connection is successful, you’ll see confirmation in the terminal.
 
