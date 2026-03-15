@@ -63,28 +63,30 @@
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles # <--- ADD THIS IMPORT
-import os # <--- ADD THIS IMPORT
-from backend.routers import documents       # Add this import
+# System and FastAPI imports added by Shameeha
+import os
+from fastapi.staticfiles import StaticFiles
 
-from backend.core.config import settings
+# Config and Database imports (Combined)
+from backend.core.config import settings, CORS_ORIGINS
 from backend.db.database import Base, engine
 
-from backend.routers import auth
-from backend.routers import results
-from backend.routers import patients
-from backend.routers import dashboard 
+# All Routers combined into a clean list
+from backend.routers import auth, results, dashboard, patients, documents
 
 app = FastAPI(title="Brain Tumor Detection API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.CORS_ORIGINS],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+import backend.models.patient
+import backend.models.audit_log
+# Create tables (simple dev approach; use Alembic later for prod)
 Base.metadata.create_all(bind=engine)
 
 # --- ADD THESE TWO LINES TO SERVE IMAGES ---
@@ -96,9 +98,9 @@ app.mount("/uploaded_docs", StaticFiles(directory="uploaded_docs"), name="upload
 
 app.include_router(auth.router)
 app.include_router(results.router)
+app.include_router(dashboard.router)
 app.include_router(patients.router)
-app.include_router(dashboard.router) 
-app.include_router(documents.router)        # Add this line
+app.include_router(documents.router)
 
 @app.get("/health")
 def health():

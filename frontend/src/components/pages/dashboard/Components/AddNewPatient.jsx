@@ -566,6 +566,7 @@
 // ===========================================================================================
 
 import React, { useState, useEffect } from 'react';
+import { api } from "../../../../util";
 
 const AddNewPatient = ({ onPatientAdded }) => {
   // MOCK DOCTORS LIST
@@ -620,10 +621,25 @@ const AddNewPatient = ({ onPatientAdded }) => {
 
   // 2. Auto-generate the next ID when the component loads
   useEffect(() => {
-    fetchLatestId().then(newId => {
-      setPatientData(prev => ({ ...prev, hospitalId: newId }));
-    });
-  }, []);
+fetchLatestId()
+      .then(fetchedLastId => {
+        // If the database is completely empty, start at NS-00000
+        const safeLastId = fetchedLastId || "NS-00000"; 
+        
+        // Nirojini's formatting logic
+        const prefix = "NS-";
+        const lastNum = parseInt(safeLastId.replace(prefix, ""), 10);
+        const nextNum = (lastNum + 1).toString().padStart(5, '0');
+
+        setPatientData(prev => ({
+          ...prev,
+          hospitalId: `${prefix}${nextNum}`
+        }));
+      })
+      .catch(error => {
+        console.error("Failed to fetch the latest patient ID:", error);
+      });
+  }, []); // Keep the empty array so it only fetches once when the component loads
 
   const handleInput = (e) => {
     const { name, value } = e.target;
@@ -693,22 +709,24 @@ const AddNewPatient = ({ onPatientAdded }) => {
     }
   };
 
-  // --- REAL DATABASE SAVE CALL ---
-  const handleSubmit = async (e) => {
+const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // Map frontend camelCase to backend snake_case
+
+    // Format age (Nirojini's feature)
+    const finalAge = patientData.age ? `${patientData.age} ${patientData.years}` : '';
+
+    // Map frontend camelCase to backend snake_case (Combined)
     const payload = {
       hospital_id: patientData.hospitalId,
       name: patientData.name,
-      age: patientData.age,
+      age: finalAge,
       gender: patientData.gender,
-      // If email/phone is empty, send 'null' to prevent validation crash
+      // If email/phone is empty, send null to prevent validation crash (Shameeha's fix)
       email: patientData.email === "" ? null : patientData.email,
       phone: patientData.phone === "" ? null : patientData.phone,
       address: patientData.address,
       symptoms: patientData.symptomsNotes,
-      assigned_doctor: patientData.assignedDoctor,
+      assigned_doctor: patientData.assignedDoctor, // Shameeha's field
       joined_date: new Date().toISOString().split('T')[0],
       discharge_date: 'Pending',
       tumour_type: 'Not Classified',
@@ -716,28 +734,17 @@ const AddNewPatient = ({ onPatientAdded }) => {
     };
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/patients", {
+      // Use Nirojini's custom 'api' utility so authentication tokens are sent automatically!
+      const savedPatient = await api("/patients", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: payload
       });
 
-      if (!response.ok) {
-        const err = await response.json();
-        // Unpack detailed validation errors to know exactly what failed
-        const errorMessage = Array.isArray(err.detail) 
-          ? err.detail.map(e => `${e.loc[e.loc.length - 1]}: ${e.msg}`).join('\n') 
-          : (err.detail || "Failed to save patient");
-          
-        throw new Error(errorMessage);
-      }
-
-      const savedPatient = await response.json();
       alert("✅ Patient successfully registered in the database!");
 
       if (onPatientAdded) onPatientAdded(savedPatient);
       
-      // Fetch the next ID instantly!
+      // Fetch the next ID instantly! (Shameeha's logic)
       const nextId = await fetchLatestId();
       
       // Reset form but assign the newly generated ID
@@ -748,7 +755,8 @@ const AddNewPatient = ({ onPatientAdded }) => {
 
     } catch (error) {
       console.error("Save Error:", error);
-      alert(`❌ Error saving patient:\n${error.message}`);
+      // The custom api utility usually throws the error message directly
+      alert(`❌ Error saving patient: ${error.message || "Please check your inputs"}`);
     }
   };
 
@@ -767,7 +775,7 @@ const AddNewPatient = ({ onPatientAdded }) => {
       </div>
 
       <div className="p-5 space-y-6">
-        
+
         {/* THE DROP BOX (OCR) */}
         <div className="group relative">
           <div 
@@ -781,9 +789,9 @@ const AddNewPatient = ({ onPatientAdded }) => {
           >
             <span className="text-3xl mb-1 group-hover:scale-110 transition-transform">📄</span>
             <p className="text-[11px] font-black text-blue-900 uppercase">Medical Report Drop-Box</p>
-            <p className="text-[9px] text-blue-400 mb-3 font-bold italic">Drag & Drop Image or PDF Here</p>
+<p className="text-[9px] text-blue-400 mb-3 font-bold italic">Drag & Drop Image or PDF Here</p>
             
-            {/* The hidden input overlay that captures clicks */}
+            {/* The hidden input overlay that captures clicks (Shameeha's validation) */}
             <input 
               type="file" 
               accept="image/*,application/pdf"
@@ -792,27 +800,43 @@ const AddNewPatient = ({ onPatientAdded }) => {
               disabled={isOcrLoading}
             />
             
-            {isOcrLoading && (
-              <div className="relative z-30 bg-blue-600 text-white px-5 py-2 rounded-lg text-[10px] font-black uppercase shadow-md flex items-center gap-2 mt-2">
+            {/* Conditional Rendering: Show spinner if loading, otherwise show Nirojini's button */}
+            {isOcrLoading ? (
+              <div className="relative z-30 bg-blue-600 text-white px-5 py-2 rounded-lg text-[10px] font-black uppercase shadow-md flex items-center justify-center gap-2 mt-2">
                 <svg className="animate-spin h-3 w-3 text-white" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                 AI Processing...
               </div>
+            ) : (
+              <button
+                type="button"
+                onClick={runOCR}
+                className="relative z-30 bg-blue-600 text-white px-5 py-2 rounded-lg text-[10px] font-black uppercase hover:bg-blue-700 transition shadow-md active:scale-95 mt-2"
+              >
+                Start OCR Extraction
+              </button>
             )}
           </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          
+
           {/* SECTION 1: IDENTITY */}
           <div className="space-y-4">
             <div className="flex items-center gap-2 border-l-4 border-blue-600 pl-2">
-               <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest">Patient Identity & Care</h3>
+<h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest">Patient Identity & Care</h3>
             </div>
 
             <div className="bg-indigo-50 p-3 rounded-xl border border-indigo-100 mx-2">
               <label className="text-[10px] font-black text-indigo-600 uppercase mb-1 block">Assign Consulting Doctor</label>
-              <select name="assignedDoctor" value={patientData.assignedDoctor} onChange={handleInput} className="w-full p-2 bg-white border border-indigo-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500" required>
+              <select 
+                name="assignedDoctor" 
+                value={patientData.assignedDoctor} 
+                onChange={handleInput} 
+                className="w-full p-2 bg-white border border-indigo-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500" 
+                required
+              >
                 <option value="">-- Select Specialist --</option>
+                {/* Ensure 'doctorsList' is defined at the top of your component! */}
                 {doctorsList.map(doc => (
                   <option key={doc.id} value={doc.name}>{doc.name}</option>
                 ))}
@@ -854,7 +878,7 @@ const AddNewPatient = ({ onPatientAdded }) => {
           {/* SECTION 2: CONTACTS */}
           <div className="space-y-4">
             <div className="flex items-center gap-2 border-l-4 border-emerald-500 pl-2">
-               <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest">Contact Information</h3>
+              <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest">Contact Information</h3>
             </div>
 
             <div className="grid grid-cols-2 gap-4 px-2 bg-emerald-50/20 p-4 rounded-2xl border border-emerald-100">
@@ -862,7 +886,7 @@ const AddNewPatient = ({ onPatientAdded }) => {
                 <label className="text-[10px] font-bold text-emerald-700/60 uppercase">Delivery Email</label>
                 <input name="email" type="email" value={patientData.email} onChange={handleInput} placeholder="patient@mail.com" className="w-full bg-transparent border-b border-emerald-200 py-1 text-xs outline-none focus:border-emerald-500" required />
               </div>
-              
+
               <div>
                 <label className="text-[10px] font-bold text-emerald-700/60 uppercase">Phone Number</label>
                 <input name="phone" type="tel" value={patientData.phone} onChange={handleInput} placeholder="+94..." className="w-full bg-transparent border-b border-emerald-200 py-1 text-xs outline-none focus:border-emerald-500" required />
@@ -880,7 +904,14 @@ const AddNewPatient = ({ onPatientAdded }) => {
             <div className="flex items-center gap-2 border-l-4 border-amber-400 pl-2">
               <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest">Symptoms & Clinical Notes</h3>
             </div>
-            <textarea name="symptomsNotes" value={patientData.symptomsNotes} onChange={handleInput} rows="3" placeholder="Clinical observations..." className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-blue-100 transition-all shadow-inner" />
+<textarea
+              name="symptomsNotes"
+              value={patientData.symptomsNotes}
+              onChange={handleInput}
+              rows="3"
+              placeholder="Clinical observations..."
+              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-blue-100 transition-all shadow-inner"
+            />
           </div>
 
           <button type="submit" className="w-full bg-slate-900 text-white py-4 rounded-xl font-black text-xs uppercase tracking-[0.3em] hover:bg-black transition-all shadow-xl active:scale-95 border-b-4 border-slate-700">
