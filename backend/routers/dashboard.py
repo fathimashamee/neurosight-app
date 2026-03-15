@@ -8,8 +8,12 @@ from backend.db.database import get_db
 from backend.core.config import settings
 from backend.models.user import User
 from backend.models.result import Result
+# Database Models (Nirojini's addition)
 from backend.models.patient import Patient
 from backend.models.audit_log import AuditLog
+
+# API Routers (Shameeha's addition)
+from backend.routers import auth, results, patients, dashboard
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"]) 
 
