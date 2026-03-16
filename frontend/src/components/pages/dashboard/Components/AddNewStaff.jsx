@@ -2,6 +2,15 @@ import { useState } from "react";
 import { api } from "../../../../util";
 import { useNavigate } from "react-router-dom";
 
+function parseApiError(err, fallback) {
+    try {
+        const parsed = JSON.parse(err?.message || "{}");
+        return parsed.detail || fallback;
+    } catch {
+        return err?.message || fallback;
+    }
+}
+
 export default function AddNewStaff() {
     const navigate = useNavigate();
     const [formData, setFormData] = useState({
@@ -35,7 +44,7 @@ export default function AddNewStaff() {
             });
             navigate("/staff");
         } catch (err) {
-            setError(err.message);
+            setError(parseApiError(err, "Failed to create staff account."));
         } finally {
             setLoading(false);
         }
@@ -125,6 +134,7 @@ export default function AddNewStaff() {
                             onChange={handleChange}
                             className="w-full border border-gray-300 rounded-lg px-4 py-2.5 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition bg-white"
                         >
+                            <option value="Super Admin">Super Admin</option>
                             <option value="Admin">Admin</option>
                             <option value="Clinician">Clinician</option>
                             <option value="Assistant">Assistant</option>

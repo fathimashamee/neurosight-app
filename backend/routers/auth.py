@@ -10,7 +10,7 @@ from urllib.parse import quote
 from backend.db.database import get_db
 from backend.core.config import settings
 from backend.models.user import User
-from backend.schemas.user import UserCreate, UserLogin, UserRead, UserSignup, UserUpdate, Token
+from backend.schemas.user import UserCreate, UserLogin, UserRead, UserUpdate, Token
 from backend.core.email_utils import create_password_reset_token, get_user_by_password_reset_token, send_welcome_email
 from backend.core.audit import log_event
 from backend.core.security import get_current_active_user, get_current_user, normalize_role, require_admin
@@ -28,27 +28,14 @@ def create_access_token(sub: str):
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
-@router.post("/signup", response_model=Token)
-def signup(body: UserSignup, request: Request, db: Session = Depends(get_db)):
-    if db.query(User).filter(User.email == body.email).first():
-        raise HTTPException(status_code=400, detail="Email already registered")
-
-    user = User(
-        email=body.email,
-        password_hash=pwd_ctx.hash(body.password),
-        name=body.name,
-        role="Clinician",
-        mobile=body.mobile,
-        status=True,
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-
+@router.post("/signup", status_code=status.HTTP_403_FORBIDDEN)
+def signup_disabled(request: Request, db: Session = Depends(get_db)):
     ip = request.client.host if request.client else "unknown"
-    log_event(db, "User Signup", user_id=user.id, ip=ip, details=f"Self-registered account: {user.email}")
-
-    return Token(access_token=create_access_token(str(user.id)))
+    try:
+        log_event(db, "Blocked Public Signup", ip=ip, status="Failed", details="Public registration is disabled")
+    except Exception:
+        pass
+    raise HTTPException(status_code=403, detail="Public registration is disabled. Contact an administrator.")
 
 @router.post("/register", response_model=UserRead)
 def register(
@@ -124,16 +111,32 @@ def list_users(db: Session = Depends(get_db), current_user: User = Depends(requi
     return db.query(User).all()
 
 @router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_user(user_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
+def delete_user(
+    user_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
     user = db.query(User).get(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
     if user.id == current_user.id:
         raise HTTPException(status_code=400, detail="Cannot delete your own account")
+
+    deleted_user_email = user.email
+    deleted_user_role = user.role
     
     db.delete(user)
     db.commit()
+
+    log_event(
+        db,
+        "User Deleted",
+        user_id=current_user.id,
+        ip=request.client.host if request.client else "unknown",
+        details=f"Deleted user: {deleted_user_email} (role: {deleted_user_role})",
+    )
     return None
 
 @router.put("/users/{user_id}", response_model=UserRead)
@@ -149,6 +152,8 @@ def update_user(
     
     if body.name is not None:
         user.name = body.name
+    if body.mobile is not None:
+        user.mobile = body.mobile
     if body.status is not None:
         user.status = body.status
     if body.role is not None:

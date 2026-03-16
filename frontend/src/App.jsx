@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import LoginForm from "./components/pages/login/LoginForm";
-import SignupForm from "./components/pages/login/SignupForm";
 import DashboardLayout from "./components/pages/dashboard/Dashboard";
 import DashboardHome from "./components/pages/dashboard/Components/DashboardHome";
 import AllPatients from "./components/pages/dashboard/Components/AllPatients";
@@ -99,7 +98,7 @@ export default function App() {
                 <Route
                   path="audit-logs"
                   element={
-                    <RoleGuard user={user} allowedRoles={["Admin"]}>
+                    <RoleGuard user={user} allowedRoles={["Super Admin", "Admin"]}>
                       <AuditLogs />
                     </RoleGuard>
                   }
@@ -107,7 +106,7 @@ export default function App() {
                 <Route
                   path="user-roles"
                   element={
-                    <RoleGuard user={user} allowedRoles={["Admin"]}>
+                    <RoleGuard user={user} allowedRoles={["Super Admin", "Admin"]}>
                       <UserRoles />
                     </RoleGuard>
                   }
@@ -117,7 +116,7 @@ export default function App() {
                 <Route
                   index
                   element={
-                    <RoleGuard user={user} allowedRoles={["Admin"]}>
+                    <RoleGuard user={user} allowedRoles={["Super Admin", "Admin"]}>
                       <AllStaffs />
                     </RoleGuard>
                   }
@@ -125,7 +124,7 @@ export default function App() {
                 <Route
                   path="new"
                   element={
-                    <RoleGuard user={user} allowedRoles={["Admin"]}>
+                    <RoleGuard user={user} allowedRoles={["Super Admin", "Admin"]}>
                       <AddNewStaff />
                     </RoleGuard>
                   }
@@ -141,7 +140,6 @@ export default function App() {
         ) : (
           <>
             <Route path="/login" element={<LoginForm onLogin={handleLogin} />} />
-            <Route path="/signup" element={<SignupForm onSignup={handleLogin} />} />
             <Route path="/forbidden" element={<Navigate to="/login" replace />} />
             <Route path="*" element={<Navigate to="/login" replace />} />
           </>

@@ -1,22 +1,41 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { api } from "../../../../util";
 
+const STAFF_ROLES = ["Super Admin", "Admin", "Clinician", "Assistant", "Technician"];
+
+function parseApiError(err, fallback) {
+    try {
+        const parsed = JSON.parse(err?.message || "{}");
+        return parsed.detail || fallback;
+    } catch {
+        return err?.message || fallback;
+    }
+}
+
 export default function AllStaffs() {
+    const navigate = useNavigate();
     const [staffs, setStaffs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [editUser, setEditUser] = useState(null);
+    const [searchName, setSearchName] = useState("");
+    const [searchEmail, setSearchEmail] = useState("");
+    const [filterRole, setFilterRole] = useState("all");
+    const [filterStatus, setFilterStatus] = useState("all");
 
     useEffect(() => {
         fetchStaffs();
     }, []);
 
     const fetchStaffs = async () => {
+        setLoading(true);
+        setError(null);
         try {
             const data = await api("/auth/users");
             setStaffs(data);
         } catch (err) {
-            setError(err.message);
+            setError(parseApiError(err, "Failed to load staff."));
         } finally {
             setLoading(false);
         }
@@ -28,7 +47,7 @@ export default function AllStaffs() {
                 await api(`/auth/users/${staffId}`, { method: "DELETE" });
                 setStaffs(staffs.filter(s => s.id !== staffId));
             } catch (err) {
-                alert("Failed to delete: " + err.message);
+                alert(parseApiError(err, "Failed to delete user."));
             }
         }
     };
@@ -39,16 +58,40 @@ export default function AllStaffs() {
 
     const handleSaveUser = async (updatedData) => {
         try {
-            await api(`/auth/users/${updatedData.id}`, {
+            const payload = {
+                name: updatedData.name,
+                mobile: updatedData.mobile,
+                role: updatedData.role,
+                status: updatedData.status,
+            };
+
+            const savedUser = await api(`/auth/users/${updatedData.id}`, {
                 method: "PUT",
-                body: updatedData
+                body: payload,
             });
-            setStaffs(staffs.map(s => s.id === updatedData.id ? { ...s, ...updatedData } : s));
+            setStaffs(staffs.map(s => (s.id === updatedData.id ? savedUser : s)));
             setEditUser(null);
+
         } catch (err) {
-            alert("Failed to update: " + err.message);
+            alert(parseApiError(err, "Failed to update user."));
         }
     };
+
+    const filteredStaffs = useMemo(() => {
+        return staffs.filter((staff) => {
+            const matchesName = (staff.name || "").toLowerCase().includes(searchName.trim().toLowerCase());
+            const matchesEmail = (staff.email || "").toLowerCase().includes(searchEmail.trim().toLowerCase());
+            const matchesRole = filterRole === "all" ? true : staff.role === filterRole;
+            const matchesStatus =
+                filterStatus === "all"
+                    ? true
+                    : filterStatus === "active"
+                      ? !!staff.status
+                      : !staff.status;
+
+            return matchesName && matchesEmail && matchesRole && matchesStatus;
+        });
+    }, [staffs, searchName, searchEmail, filterRole, filterStatus]);
 
     if (loading) return <div className="p-4">Loading...</div>;
     if (error) return <div className="p-4 text-red-600">Error: {error}</div>;
@@ -57,22 +100,55 @@ export default function AllStaffs() {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200">
             <div className="p-4 border-b border-gray-200 flex justify-between items-center">
                 <h2 className="text-lg font-semibold text-gray-800">All Staffs</h2>
-                <button onClick={() => window.location.href = '/staff/new'} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition">
-                    + Add New Staff
-                </button>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={fetchStaffs}
+                        className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition"
+                    >
+                        Refresh
+                    </button>
+                    <button
+                        onClick={() => navigate("/staff/new")}
+                        className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition"
+                    >
+                        + Add New Staff
+                    </button>
+                </div>
             </div>
 
             <div className="p-4">
                 {/* Search/Filter Bar */}
                 <div className="flex gap-4 mb-4">
-                    <input className="border rounded-md px-3 py-2 w-full max-w-xs text-sm" placeholder="Staff Name" />
-                    <input className="border rounded-md px-3 py-2 w-full max-w-xs text-sm" placeholder="Email" />
-                    <select className="border rounded-md px-3 py-2 text-sm text-gray-600">
-                        <option>Role</option>
-                        <option>Admin</option>
-                        <option>Clinician</option>
-                        <option>Assistant</option>
-                        <option>Technician</option>
+                    <input
+                        className="border rounded-md px-3 py-2 w-full max-w-xs text-sm"
+                        placeholder="Search by staff name"
+                        value={searchName}
+                        onChange={(e) => setSearchName(e.target.value)}
+                    />
+                    <input
+                        className="border rounded-md px-3 py-2 w-full max-w-xs text-sm"
+                        placeholder="Search by email"
+                        value={searchEmail}
+                        onChange={(e) => setSearchEmail(e.target.value)}
+                    />
+                    <select
+                        className="border rounded-md px-3 py-2 text-sm text-gray-600"
+                        value={filterRole}
+                        onChange={(e) => setFilterRole(e.target.value)}
+                    >
+                        <option value="all">All roles</option>
+                        {STAFF_ROLES.map((role) => (
+                            <option key={role} value={role}>{role}</option>
+                        ))}
+                    </select>
+                    <select
+                        className="border rounded-md px-3 py-2 text-sm text-gray-600"
+                        value={filterStatus}
+                        onChange={(e) => setFilterStatus(e.target.value)}
+                    >
+                        <option value="all">All statuses</option>
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
                     </select>
                 </div>
 
@@ -90,7 +166,7 @@ export default function AllStaffs() {
                             </tr>
                         </thead>
                         <tbody className="text-sm text-gray-700">
-                            {staffs.map((staff, idx) => (
+                            {filteredStaffs.map((staff) => (
                                 <tr key={staff.id} className="border-b last:border-0 hover:bg-gray-50 bg-lime-50/30">
                                     <td className="p-3">#{staff.id}</td>
                                     <td className="p-3 font-medium text-gray-900">{staff.name || "N/A"}</td>
@@ -102,40 +178,18 @@ export default function AllStaffs() {
                                         </span>
                                     </td>
                                     <td className="p-3 flex justify-center gap-2">
-                                        {/* Status Toggle */}
-                                        <div className="relative inline-block w-8 h-4 align-middle select-none transition duration-200 ease-in mt-1 mr-2">
-                                            <input
-                                                type="checkbox"
-                                                name="toggle"
-                                                id={`toggle-${staff.id}`}
-                                                checked={staff.status}
-                                                onChange={() => handleSaveUser({ id: staff.id, status: !staff.status })}
-                                                className="toggle-checkbox absolute block w-4 h-4 rounded-full bg-white border-4 appearance-none cursor-pointer checked:right-0 checked:border-green-400"
-                                            />
-                                            <label htmlFor={`toggle-${staff.id}`} className={`toggle-label block overflow-hidden h-4 rounded-full cursor-pointer ${staff.status ? 'bg-green-400' : 'bg-gray-300'}`}></label>
-                                        </div>
-
-                                        <button className="text-blue-500 hover:text-blue-700" onClick={() => handleEdit(staff)}>✏️</button>
-                                        <button className="text-red-500 hover:text-red-700" onClick={() => handleDelete(staff.id)}>🗑️</button>
+                                        <button className="text-blue-600 hover:text-blue-800" onClick={() => handleEdit(staff)}>Edit</button>
+                                        <button className="text-red-600 hover:text-red-800" onClick={() => handleDelete(staff.id)}>Delete</button>
                                     </td>
                                 </tr>
                             ))}
-                            {staffs.length === 0 && (
+                            {filteredStaffs.length === 0 && (
                                 <tr>
                                     <td colSpan="6" className="p-6 text-center text-gray-500">No staff found.</td>
                                 </tr>
                             )}
                         </tbody>
                     </table>
-                </div>
-
-                {/* Pagination Placeholder */}
-                <div className="flex justify-end mt-4 gap-1">
-                    <button className="px-2 py-1 border rounded hover:bg-gray-50 text-gray-500">«</button>
-                    <button className="px-2 py-1 border rounded bg-indigo-600 text-white">1</button>
-                    <button className="px-2 py-1 border rounded hover:bg-gray-50 text-gray-500">2</button>
-                    <button className="px-2 py-1 border rounded hover:bg-gray-50 text-gray-500">3</button>
-                    <button className="px-2 py-1 border rounded hover:bg-gray-50 text-gray-500">»</button>
                 </div>
             </div>
             {editUser && (
@@ -154,6 +208,7 @@ function EditUserModal({ user, onClose, onSave }) {
         id: user.id,
         name: user.name || "",
         email: user.email,
+        mobile: user.mobile || "",
         role: user.role,
         status: user.status ?? true
     });
@@ -189,8 +244,16 @@ function EditUserModal({ user, onClose, onSave }) {
                         <input className="w-full border border-gray-300 rounded px-3 py-2 bg-gray-50 text-gray-500" value={formData.email} disabled />
                     </div>
                     <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Mobile</label>
+                        <input name="mobile" className="w-full border border-gray-300 rounded px-3 py-2" value={formData.mobile} onChange={handleChange} />
+                    </div>
+                    <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
-                        <input className="w-full border border-gray-300 rounded px-3 py-2 bg-gray-50 text-gray-500" value={formData.role} disabled />
+                        <select name="role" className="w-full border border-gray-300 rounded px-3 py-2" value={formData.role} onChange={handleChange}>
+                            {STAFF_ROLES.map((role) => (
+                                <option key={role} value={role}>{role}</option>
+                            ))}
+                        </select>
                     </div>
                     <div className="flex items-center justify-between">
                         <label className="text-sm font-medium text-gray-700">Status</label>

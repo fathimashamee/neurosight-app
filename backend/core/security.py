@@ -8,14 +8,14 @@ from backend.core.config import settings
 from backend.db.database import get_db
 from backend.models.user import User
 
-ALLOWED_ROLES = {"Admin", "Clinician", "Assistant", "Technician"}
+ALLOWED_ROLES = {"Super Admin", "Admin", "Clinician", "Assistant", "Technician"}
 
 
 def normalize_role(role: str | None) -> str:
     if not role:
         return "Clinician"
 
-    normalized = role.strip().title()
+    normalized = " ".join(part.capitalize() for part in role.strip().split())
     if normalized not in ALLOWED_ROLES:
         allowed = ", ".join(sorted(ALLOWED_ROLES))
         raise HTTPException(
@@ -69,5 +69,5 @@ def require_roles(*roles: str) -> Callable:
     return dependency
 
 
-def require_admin(current_user: User = Depends(require_roles("Admin"))) -> User:
+def require_admin(current_user: User = Depends(require_roles("Super Admin", "Admin"))) -> User:
     return current_user

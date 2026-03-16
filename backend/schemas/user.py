@@ -30,6 +30,7 @@ class UserRead(BaseModel):
 
 class UserUpdate(BaseModel):
     name: str | None = None
+    mobile: str | None = None
     role: str | None = None
     status: bool | None = None
 

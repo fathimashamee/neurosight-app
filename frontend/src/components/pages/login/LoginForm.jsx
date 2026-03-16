@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
 import { api, fetchCurrentUser, setToken } from "../../../util";
 
 export default function LoginForm({ onLogin }) {
@@ -83,7 +82,7 @@ export default function LoginForm({ onLogin }) {
         </button>
 
         <p className="text-center text-sm text-gray-500 mt-4">
-          Don’t have an account? <Link to="/signup" className="text-indigo-600 font-semibold hover:underline">Sign up</Link>
+          Need access? Contact a system administrator to create your account.
         </p>
       </form>
     </div>

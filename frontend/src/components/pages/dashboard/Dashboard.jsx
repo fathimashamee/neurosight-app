@@ -15,6 +15,8 @@ const Icons = {
 };
 
 function Sidebar({ collapsed, role, onLogout }) {
+  const canManageStaff = role === "Admin" || role === "Super Admin";
+
   const NavItem = ({ to, label, Icon }) => (
     <NavLink to={to} className={({ isActive }) => `flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all text-sm mb-1 ${isActive ? "bg-slate-800 text-white shadow-md font-medium" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"}`}>
       <Icon />
@@ -50,7 +52,7 @@ function Sidebar({ collapsed, role, onLogout }) {
 
 
         {/* STAFF MANAGEMENT: Admin Only */}
-        {role === "Admin" && (
+        {canManageStaff && (
           <div>
             <div className={`mb-2 px-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ${collapsed ? 'hidden' : 'block'}`}>Staff Management</div>
             <NavItem to="/staff" label="Staff Records" Icon={Icons.Staff} />
@@ -59,7 +61,7 @@ function Sidebar({ collapsed, role, onLogout }) {
         )}
 
         {/* SYSTEM MANAGEMENT: Admin Only */}
-        {role === "Admin" && (
+        {canManageStaff && (
           <div>
             <div className={`mb-2 px-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ${collapsed ? 'hidden' : 'block'}`}>System Management</div>
             <NavItem to="/system/audit-logs" label="Audit Logs" Icon={Icons.System} />
