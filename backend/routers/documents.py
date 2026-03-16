@@ -7,6 +7,8 @@ import shutil
 from datetime import date
 
 from backend.db.database import Base, get_db
+from backend.core.security import get_current_active_user
+from backend.models.user import User
 
 class Document(Base):
     __tablename__ = "documents"
@@ -27,7 +29,8 @@ async def upload_document(
     patient_id: int = Form(...),
     doc_type: str = Form("Clinical Report"),
     file: UploadFile = File(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     file_ext = file.filename.split(".")[-1]
     safe_name = f"{uuid.uuid4()}.{file_ext}"
@@ -49,11 +52,11 @@ async def upload_document(
     return new_doc
 
 @router.get("/patient/{patient_id}")
-def get_patient_docs(patient_id: int, db: Session = Depends(get_db)):
+def get_patient_docs(patient_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
     return db.query(Document).filter(Document.patient_id == patient_id).order_by(Document.id.desc()).all()
 
 @router.delete("/{doc_id}")
-def delete_document(doc_id: int, db: Session = Depends(get_db)):
+def delete_document(doc_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
     doc = db.query(Document).filter(Document.id == doc_id).first()
     if doc:
         try:

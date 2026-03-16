@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request, Header
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 from jose import jwt
@@ -6,7 +6,6 @@ from datetime import datetime, timedelta
 import secrets
 from pydantic import BaseModel
 from urllib.parse import quote
-from jose import JWTError, jwt as jose_jwt
 
 from backend.db.database import get_db
 from backend.core.config import settings
@@ -14,6 +13,7 @@ from backend.models.user import User
 from backend.schemas.user import UserCreate, UserLogin, UserRead, UserSignup, UserUpdate, Token
 from backend.core.email_utils import create_password_reset_token, get_user_by_password_reset_token, send_welcome_email
 from backend.core.audit import log_event
+from backend.core.security import get_current_active_user, get_current_user, normalize_role, require_admin
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -22,56 +22,6 @@ pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 class SetPasswordRequest(BaseModel):
     token: str
     new_password: str
-
-
-def require_admin_user(
-    request: Request,
-    authorization: str | None = Header(default=None),
-    db: Session = Depends(get_db),
-) -> User:
-    ip = request.client.host if request.client else "unknown"
-
-    if not authorization or not authorization.lower().startswith("bearer "):
-        try:
-            log_event(db, "Unauthorized Register Attempt", ip=ip, status="Failed", details="Missing token")
-        except Exception:
-            pass
-        raise HTTPException(status_code=401, detail="Missing token")
-
-    token = authorization.split()[1]
-    try:
-        payload = jose_jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        requester_id = int(payload.get("sub"))
-    except (JWTError, TypeError, ValueError):
-        try:
-            log_event(db, "Unauthorized Register Attempt", ip=ip, status="Failed", details="Invalid token")
-        except Exception:
-            pass
-        raise HTTPException(status_code=401, detail="Invalid token")
-
-    requester = db.query(User).get(requester_id)
-    if not requester:
-        try:
-            log_event(db, "Unauthorized Register Attempt", ip=ip, status="Failed", details="Requester not found")
-        except Exception:
-            pass
-        raise HTTPException(status_code=401, detail="User not found")
-
-    if requester.role != "Admin":
-        try:
-            log_event(
-                db,
-                "Unauthorized Register Attempt",
-                user_id=requester.id,
-                ip=ip,
-                status="Failed",
-                details=f"Non-admin role attempted register: {requester.role}",
-            )
-        except Exception:
-            pass
-        raise HTTPException(status_code=403, detail="Unauthorized")
-
-    return requester
 
 def create_access_token(sub: str):
     to_encode = {"sub": sub, "exp": datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)}
@@ -105,20 +55,20 @@ def register(
     body: UserCreate,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_user),
+    current_user: User = Depends(require_admin),
 ):
     if db.query(User).filter(User.email == body.email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
 
     # New users are activated after setting their password via one-time link.
-    temporary_password = secrets.token_urlsafe(24)
+    temporary_password = body.password or secrets.token_urlsafe(24)
     user = User(
         email=body.email, 
         password_hash=pwd_ctx.hash(temporary_password),
         name=body.name,
-        role="Clinician",
+        role=normalize_role(body.role),
         mobile=body.mobile,
-        status=False
+        status=body.status,
     )
     db.add(user); db.commit(); db.refresh(user)
 
@@ -166,39 +116,33 @@ def set_password(body: SetPasswordRequest, request: Request, db: Session = Depen
 # Minimal /me using token in Authorization: Bearer <token>
 
 @router.get("/me", response_model=UserRead)
-def me(authorization: str | None = Header(default=None), db: Session = Depends(get_db)):
-    if not authorization or not authorization.lower().startswith("bearer "):
-        raise HTTPException(status_code=401, detail="Missing token")
-    token = authorization.split()[1]
-    try:
-        payload = jose_jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        user_id = int(payload.get("sub"))
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid token")
-    user = db.query(User).get(user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    return user
+def me(current_user: User = Depends(get_current_user)):
+    return current_user
 
 @router.get("/users", response_model=list[UserRead])
-def list_users(db: Session = Depends(get_db)):
+def list_users(db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
     return db.query(User).all()
 
 @router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_user(user_id: int, db: Session = Depends(get_db), current_user: User = Depends(me)):
-    # Optional: Check if current_user is Admin
-    # if current_user.role != "Admin": raise HTTPException...
-    
+def delete_user(user_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
     user = db.query(User).get(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+
+    if user.id == current_user.id:
+        raise HTTPException(status_code=400, detail="Cannot delete your own account")
     
     db.delete(user)
     db.commit()
     return None
 
 @router.put("/users/{user_id}", response_model=UserRead)
-def update_user(user_id: int, body: UserUpdate, db: Session = Depends(get_db)):
+def update_user(
+    user_id: int,
+    body: UserUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
     user = db.query(User).get(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -206,16 +150,12 @@ def update_user(user_id: int, body: UserUpdate, db: Session = Depends(get_db)):
     if body.name is not None:
         user.name = body.name
     if body.status is not None:
-        # Assuming we have a status column. Since we added it to schema but not model, 
-        # let's quick check model. If not in model, migration needed.
-        # Wait, I recall adding it to schema but user asked for status change. 
-        # I should check if user model has status. If not, I need to add it.
-        # For now, let's assume it's there or I will add it.
-        # Actually, previous convo showed User model. Let me check my memory.
-        # View file to be sure.
-        pass # Placeholder till I check model.
-        if hasattr(user, "status"):
-            user.status = body.status
+        user.status = body.status
+    if body.role is not None:
+        user.role = normalize_role(body.role)
+
+    if user.id == current_user.id and user.status is False:
+        raise HTTPException(status_code=400, detail="Cannot deactivate your own account")
             
     db.commit()
     db.refresh(user)

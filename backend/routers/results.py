@@ -1,29 +1,23 @@
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Header, Request, Form
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Request, Form
 from sqlalchemy.orm import Session
 import os
 import uuid
 import shutil
 import logging
+from pathlib import Path
 
 from backend.db.database import get_db
 from backend.models.result import Result
 from backend.schemas.result import ResultRead
-from jose import jwt
 from backend.core.audit import log_event
+from backend.core.config import settings
+from backend.core.detector import predict
+from backend.core.security import get_current_active_user
 from backend.models.patient import Patient
+from backend.models.user import User
 
 router = APIRouter(prefix="/results", tags=["results"])
 logger = logging.getLogger(__name__)
-
-# ==========================================================
-# 1. Auth Helper (Nirojini's Security)
-# ==========================================================
-def get_user_id(authorization: str | None = Header(default=None)) -> int:
-    if not authorization or not authorization.lower().startswith("bearer "):
-        raise HTTPException(status_code=401, detail="Missing token")
-    token = authorization.split()[1]
-    payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-    return int(payload.get("sub"))
 
 # ==========================================================
 # 2. The Combined Upload & Analyze Endpoint
@@ -34,7 +28,7 @@ def upload_scan(
     file: UploadFile = File(...),
     patient_id: int = Form(...),  # Shameeha's patient linking
     db: Session = Depends(get_db),
-    user_id: int = Depends(get_user_id) # Nirojini's auth
+    current_user: User = Depends(get_current_active_user),
 ):
     # 1. Verify patient exists (Shameeha)
     patient = db.query(Patient).filter(Patient.id == patient_id).first()
@@ -54,11 +48,14 @@ def upload_scan(
         shutil.copyfileobj(file.file, f)
 
     # 4. Run the ACTUAL AI prediction (Nirojini)
-    label, conf = predict(str(dst))
+    try:
+        label, conf = predict(str(dst))
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
 
     # 5. Save the classification result to the database (Combined)
     result = Result(
-        user_id=user_id, 
+        user_id=current_user.id,
         patient_id=patient_id, 
         filename=str(dst), 
         predicted_label=label, 
@@ -77,8 +74,8 @@ def upload_scan(
     # 7. Audit Logging (Nirojini)
     ip = request.client.host if request.client else "unknown"
     try:
-        log_event(db, "MRI Upload", user_id=user_id, ip=ip, details=f"Uploaded for Patient ID {patient_id}: {file.filename}")
-        log_event(db, "Model Inference", user_id=user_id, ip=ip, details=f"Classification: {label} ({conf*100:.1f}% confidence)")
+        log_event(db, "MRI Upload", user_id=current_user.id, ip=ip, details=f"Uploaded for Patient ID {patient_id}: {file.filename}")
+        log_event(db, "Model Inference", user_id=current_user.id, ip=ip, details=f"Classification: {label} ({conf*100:.1f}% confidence)")
     except Exception as e:
         # Assuming logger is defined at the top of your file: logger = logging.getLogger(__name__)
         print(f"Audit log write failed in results upload: {e}")
@@ -91,19 +88,19 @@ def upload_scan(
 
 # Get all results for logged in doctor (Nirojini)
 @router.get("/", response_model=list[ResultRead])
-def list_results(db: Session = Depends(get_db), user_id: int = Depends(get_user_id)):
-    return db.query(Result).filter(Result.user_id == user_id).order_by(Result.id.desc()).all()
+def list_results(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
+    return db.query(Result).filter(Result.user_id == current_user.id).order_by(Result.id.desc()).all()
 
 # Get a specific result (Nirojini)
 @router.get("/{result_id}", response_model=ResultRead)
-def get_result(result_id: int, db: Session = Depends(get_db), user_id: int = Depends(get_user_id)):
-    r = db.query(Result).filter(Result.id == result_id, Result.user_id == user_id).first()
+def get_result(result_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
+    r = db.query(Result).filter(Result.id == result_id, Result.user_id == current_user.id).first()
     if not r: raise HTTPException(status_code=404, detail="Not found")
     return r
 
 # Fetch all scans for a specific patient (Shameeha)
 @router.get("/patient/{patient_id}")
-def get_patient_results(patient_id: int, db: Session = Depends(get_db)):
+def get_patient_results(patient_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
     results = db.query(Result).filter(Result.patient_id == patient_id).order_by(Result.created_at.desc()).all()
     return results
 # Ensure an upload directory exists for storing the MRI images
@@ -114,7 +111,8 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 async def analyze_and_save_mri(
     patient_id: int = Form(...),
     file: UploadFile = File(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     # 1. Verify the patient actually exists
     patient = db.query(Patient).filter(Patient.id == patient_id).first()
@@ -140,7 +138,7 @@ async def analyze_and_save_mri(
     # 4. Save the classification result to the database
     new_result = Result(
         patient_id=patient_id,
-        user_id=1, # (Hardcoded to 1 for now, later you can extract this from the logged-in user token)
+        user_id=current_user.id,
         filename=safe_filename,
         predicted_label=predicted_label,
         confidence=confidence_score
@@ -163,8 +161,3 @@ async def analyze_and_save_mri(
         "saved_filename": safe_filename
     }
 
-# Endpoint to fetch all scans for a specific patient
-@router.get("/patient/{patient_id}")
-def get_patient_results(patient_id: int, db: Session = Depends(get_db)):
-    results = db.query(Result).filter(Result.patient_id == patient_id).order_by(Result.created_at.desc()).all()
-    return results

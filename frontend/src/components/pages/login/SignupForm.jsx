@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { api, setToken } from "../../../util";
+import { api, fetchCurrentUser, setToken } from "../../../util";
 
 function getErrorMessage(error) {
   try {
@@ -46,6 +46,7 @@ export default function SignupForm({ onSignup }) {
     try {
       const { access_token } = await api("/auth/signup", {
         method: "POST",
+        timeoutMs: 15000,
         body: {
           name: form.name,
           email: form.email,
@@ -54,7 +55,13 @@ export default function SignupForm({ onSignup }) {
         },
       });
       setToken(access_token);
-      onSignup?.();
+      let user = null;
+      try {
+        user = await fetchCurrentUser(5000);
+      } catch {
+        // Account creation already succeeded; continue to app shell.
+      }
+      onSignup?.(user);
       navigate("/", { replace: true });
     } catch (signupError) {
       setError(getErrorMessage(signupError));

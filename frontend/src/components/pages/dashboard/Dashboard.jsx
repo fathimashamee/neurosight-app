@@ -1,6 +1,5 @@
-import { useState, useEffect } from "react";
-import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { removeToken, api } from "../../../util";
+import { useState } from "react";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
 
 // Standardized Corporate SVG Icons
 const Icons = {
@@ -50,12 +49,14 @@ function Sidebar({ collapsed, role, onLogout }) {
         </div>
 
 
-        {/* STAFF MANAGEMENT */}
-        <div>
-          <div className={`mb-2 px-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ${collapsed ? 'hidden' : 'block'}`}>Staff Management</div>
-          <NavItem to="/staff" label="Staff Records" Icon={Icons.Staff} />
-          <NavItem to="/staff/new" label="Add New Staff" Icon={Icons.Add} />
-        </div>
+        {/* STAFF MANAGEMENT: Admin Only */}
+        {role === "Admin" && (
+          <div>
+            <div className={`mb-2 px-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ${collapsed ? 'hidden' : 'block'}`}>Staff Management</div>
+            <NavItem to="/staff" label="Staff Records" Icon={Icons.Staff} />
+            <NavItem to="/staff/new" label="Add New Staff" Icon={Icons.Add} />
+          </div>
+        )}
 
         {/* SYSTEM MANAGEMENT: Admin Only */}
         {role === "Admin" && (
@@ -86,30 +87,12 @@ function Sidebar({ collapsed, role, onLogout }) {
   );
 }
 
-export default function Dashboard({ onLogout }) {
+export default function Dashboard({ onLogout, user }) {
   const [collapsed, setCollapsed] = useState(false);
-  const [user, setUser] = useState(null);
   const navigate = useNavigate();
-
-  useEffect(() => {
-    // Fetch user data from backend
-    api("/auth/me")
-      .then((data) => {
-        setUser(data);
-      })
-      .catch((err) => {
-        console.error("Failed to fetch user:", err);
-        setUser(null);
-        removeToken();
-        onLogout?.();
-        navigate("/login", { replace: true });
-      });
-  }, [navigate, onLogout]);
 
   const handleLogout = () => {
     if (window.confirm("Are you sure you want to logout?")) {
-      setUser(null);
-      removeToken();
       onLogout?.();
       navigate("/login", { replace: true });
     }

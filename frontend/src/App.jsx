@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import LoginForm from "./components/pages/login/LoginForm";
 import SignupForm from "./components/pages/login/SignupForm";
@@ -15,17 +15,73 @@ import UserRoles from "./components/pages/dashboard/Components/UserRoles";
 import AllStaffs from "./components/pages/dashboard/Components/AllStaffs";
 import AddNewStaff from "./components/pages/dashboard/Components/AddNewStaff";
 import ResultViewer from "./components/ResultViewer";
-import { getToken } from "./util";
+import { clearAuth, fetchCurrentUser, getCurrentUser, getToken } from "./util";
+
+function RoleGuard({ user, allowedRoles, children }) {
+  if (!user) return <Navigate to="/login" replace />;
+  if (!allowedRoles.includes(user.role)) return <Navigate to="/forbidden" replace />;
+  return children;
+}
+
+function Forbidden() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6">
+      <div className="max-w-md w-full bg-white border border-slate-200 rounded-xl p-8 text-center shadow-sm">
+        <h1 className="text-2xl font-bold text-slate-900">Access Denied</h1>
+        <p className="mt-3 text-slate-600">Your role does not have permission to access this page.</p>
+      </div>
+    </div>
+  );
+}
 
 export default function App() {
   const [authed, setAuthed] = useState(!!getToken());
+  const [user, setUser] = useState(getCurrentUser());
+  const [sessionReady, setSessionReady] = useState(false);
+
+  useEffect(() => {
+    const token = getToken();
+    if (!token) {
+      setAuthed(false);
+      setUser(null);
+      setSessionReady(true);
+      return;
+    }
+
+    fetchCurrentUser()
+      .then((me) => {
+        setAuthed(true);
+        setUser(me);
+      })
+      .catch(() => {
+        clearAuth();
+        setAuthed(false);
+        setUser(null);
+      })
+      .finally(() => setSessionReady(true));
+  }, []);
+
+  const handleLogin = (loggedInUser) => {
+    setAuthed(true);
+    setUser(loggedInUser || getCurrentUser());
+  };
+
+  const handleLogout = () => {
+    clearAuth();
+    setAuthed(false);
+    setUser(null);
+  };
+
+  if (!sessionReady) {
+    return <div className="min-h-screen grid place-items-center text-slate-600">Loading session...</div>;
+  }
 
   return (
     <BrowserRouter>
       <Routes>
         {authed ? (
           <>
-            <Route path="/" element={<DashboardLayout onLogout={() => setAuthed(false)} />}>
+            <Route path="/" element={<DashboardLayout user={user} onLogout={handleLogout} />}>
               <Route index element={<DashboardHome />} />
               <Route path="patients">
                 <Route index element={<AllPatients />} />
@@ -40,23 +96,53 @@ export default function App() {
                 <Route path="history" element={<ReportHistory />} />
               </Route>
               <Route path="system">
-                <Route path="audit-logs" element={<AuditLogs />} />
-                <Route path="user-roles" element={<UserRoles />} />
+                <Route
+                  path="audit-logs"
+                  element={
+                    <RoleGuard user={user} allowedRoles={["Admin"]}>
+                      <AuditLogs />
+                    </RoleGuard>
+                  }
+                />
+                <Route
+                  path="user-roles"
+                  element={
+                    <RoleGuard user={user} allowedRoles={["Admin"]}>
+                      <UserRoles />
+                    </RoleGuard>
+                  }
+                />
               </Route>
               <Route path="staff">
-                <Route index element={<AllStaffs />} />
-                <Route path="new" element={<AddNewStaff />} />
+                <Route
+                  index
+                  element={
+                    <RoleGuard user={user} allowedRoles={["Admin"]}>
+                      <AllStaffs />
+                    </RoleGuard>
+                  }
+                />
+                <Route
+                  path="new"
+                  element={
+                    <RoleGuard user={user} allowedRoles={["Admin"]}>
+                      <AddNewStaff />
+                    </RoleGuard>
+                  }
+                />
               </Route>
               <Route path="results/:id" element={<ResultViewer />} />
             </Route>
+            <Route path="/forbidden" element={<Forbidden />} />
             <Route path="/login" element={<Navigate to="/" replace />} />
             <Route path="/signup" element={<Navigate to="/" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </>
         ) : (
           <>
-            <Route path="/login" element={<LoginForm onLogin={() => setAuthed(true)} />} />
-            <Route path="/signup" element={<SignupForm onSignup={() => setAuthed(true)} />} />
+            <Route path="/login" element={<LoginForm onLogin={handleLogin} />} />
+            <Route path="/signup" element={<SignupForm onSignup={handleLogin} />} />
+            <Route path="/forbidden" element={<Navigate to="/login" replace />} />
             <Route path="*" element={<Navigate to="/login" replace />} />
           </>
         )}

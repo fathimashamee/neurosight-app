@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { api, setToken } from "../../../util";
+import { api, fetchCurrentUser, setToken } from "../../../util";
 
 export default function LoginForm({ onLogin }) {
   const [email, setEmail] = useState("");
@@ -15,10 +15,17 @@ export default function LoginForm({ onLogin }) {
     try {
       const { access_token } = await api("/auth/login", {
         method: "POST",
+        timeoutMs: 15000,
         body: { email, password },
       });
       setToken(access_token);
-      onLogin?.();
+      let user = null;
+      try {
+        user = await fetchCurrentUser(5000);
+      } catch {
+        // Login succeeded; continue and let app bootstrap fetch profile later.
+      }
+      onLogin?.(user);
     } catch (e) {
       setErr("Invalid email or password. Please try again.");
     } finally {

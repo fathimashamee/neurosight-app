@@ -1,13 +1,12 @@
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import datetime, timedelta
-from jose import jwt
 
 from backend.db.database import get_db
-from backend.core.config import settings
 from backend.models.user import User
 from backend.models.result import Result
+from backend.core.security import get_current_active_user, require_admin
 # Database Models (Nirojini's addition)
 from backend.models.patient import Patient
 from backend.models.audit_log import AuditLog
@@ -17,25 +16,9 @@ from backend.routers import auth, results, patients, dashboard
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"]) 
 
-def get_user_id(authorization: str | None = Header(default=None)) -> int:
-    if not authorization or not authorization.lower().startswith("bearer "):
-        raise HTTPException(status_code=401, detail="Missing token")
-    token = authorization.split()[1]
-    payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-    return int(payload.get("sub"))
-
-
-def require_admin(db: Session, user_id: int) -> User:
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=401, detail="User not found")
-    if user.role != "Admin":
-        raise HTTPException(status_code=403, detail="Unauthorized")
-    return user
-
 
 @router.get("/summary")
-def summary(db: Session = Depends(get_db), user_id: int = Depends(get_user_id)):
+def summary(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
     # Total users breakdown
     total_counts = db.query(User.role, func.count(User.id)).group_by(User.role).all()
     total_users_by_role = {role: count for role, count in total_counts}
@@ -65,8 +48,7 @@ def summary(db: Session = Depends(get_db), user_id: int = Depends(get_user_id)):
 
 
 @router.get("/audit-logs")
-def audit_logs(limit: int = 10, status: str = None, db: Session = Depends(get_db), user_id: int = Depends(get_user_id)):
-    require_admin(db, user_id)
+def audit_logs(limit: int = 10, status: str = None, db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
 
     query = db.query(AuditLog)
     if status and status != "All":
@@ -89,8 +71,7 @@ def audit_logs(limit: int = 10, status: str = None, db: Session = Depends(get_db
 
 
 @router.get("/user-roles")
-def user_roles(db: Session = Depends(get_db), user_id: int = Depends(get_user_id)):
-    require_admin(db, user_id)
+def user_roles(db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
 
     role_counts = db.query(User.role, func.count(User.id)).group_by(User.role).all()
     return [{"role": role, "count": count} for role, count in role_counts]

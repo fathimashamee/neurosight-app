@@ -5,6 +5,7 @@ class UserCreate(BaseModel):
     password: str
     name: str | None = None
     mobile: str | None = None
+    role: str = "Clinician"
     status: bool = True
 
 class UserSignup(BaseModel):
@@ -29,6 +30,7 @@ class UserRead(BaseModel):
 
 class UserUpdate(BaseModel):
     name: str | None = None
+    role: str | None = None
     status: bool | None = None
 
 class Token(BaseModel):

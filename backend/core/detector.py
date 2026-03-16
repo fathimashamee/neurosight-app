@@ -5,10 +5,55 @@ from pathlib import Path
 
 # Load the model once when the app starts
 MODEL_PATH = Path(__file__).resolve().parent.parent / "models" / "brain_tumor_model.h5"
-print(f"Loading model from: {MODEL_PATH}")
-model = tf.keras.models.load_model(MODEL_PATH)
+model = None
 
 IMG_HEIGHT, IMG_WIDTH = 128, 128  # must match model training size
+
+
+def _get_model():
+    global model
+
+    if model is not None:
+        return model
+
+    if not MODEL_PATH.exists():
+        raise RuntimeError(f"Model file not found: {MODEL_PATH}")
+
+    print(f"Loading model from: {MODEL_PATH}")
+    model = tf.keras.models.load_model(MODEL_PATH)
+    return model
+
+
+def get_model_readiness(load: bool = False) -> dict:
+    file_exists = MODEL_PATH.exists()
+    loaded = model is not None
+
+    if not load:
+        return {
+            "ready": file_exists,
+            "model_file_exists": file_exists,
+            "model_loaded": loaded,
+            "model_path": str(MODEL_PATH),
+            "error": None if file_exists else f"Model file not found: {MODEL_PATH}",
+        }
+
+    try:
+        _get_model()
+        return {
+            "ready": True,
+            "model_file_exists": True,
+            "model_loaded": True,
+            "model_path": str(MODEL_PATH),
+            "error": None,
+        }
+    except Exception as exc:
+        return {
+            "ready": False,
+            "model_file_exists": file_exists,
+            "model_loaded": False,
+            "model_path": str(MODEL_PATH),
+            "error": str(exc),
+        }
 
 def predict(image_path: str):
     """
@@ -19,12 +64,14 @@ def predict(image_path: str):
         tuple[str, float]: (label, confidence)
     """
 
+    loaded_model = _get_model()
+
     img = load_img(image_path, target_size=(IMG_HEIGHT, IMG_WIDTH))
     img_array = img_to_array(img)
     img_array = np.expand_dims(img_array, axis=0) / 255.0  # normalize
 
     # Model outputs a single sigmoid value (0 = healthy, 1 = tumor)
-    prediction = model.predict(img_array)[0][0]
+    prediction = loaded_model.predict(img_array)[0][0]
     confidence = float(prediction if prediction > 0.5 else 1 - prediction)
 
     if prediction > 0.5:

@@ -69,6 +69,7 @@ from fastapi.staticfiles import StaticFiles
 
 # Config and Database imports (Combined)
 from backend.core.config import settings, CORS_ORIGINS
+from backend.core.detector import get_model_readiness
 from backend.db.database import Base, engine
 
 # All Routers combined into a clean list
@@ -105,3 +106,13 @@ app.include_router(documents.router)
 @app.get("/health")
 def health():
     return {"status": "ok", "message": "Backend is running!"}
+
+
+@app.get("/health/model")
+def health_model(load: bool = False):
+    readiness = get_model_readiness(load=load)
+    return {
+        "status": "ok" if readiness["ready"] else "degraded",
+        "message": "Model is ready" if readiness["ready"] else "Model is not ready",
+        **readiness,
+    }

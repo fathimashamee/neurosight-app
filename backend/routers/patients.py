@@ -1,5 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Header, Request, UploadFile, File
-from jose import jwt
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import List
 import pytesseract
@@ -10,8 +9,10 @@ import fitz  # PyMuPDF
 
 from backend.core.config import settings
 from backend.core.audit import log_event
+from backend.core.security import get_current_active_user
 from backend.db.database import get_db
 from backend.models.patient import Patient
+from backend.models.user import User
 
 # IMPORTANT: I imported both PatientRead (Nirojini) and PatientResponse (Shameeha) here. 
 # You need to check your backend/schemas/patient.py file to see which one actually exists!
@@ -21,19 +22,6 @@ from backend.schemas.patient import PatientCreate, PatientRead, PatientResponse,
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
 router = APIRouter(prefix="/patients", tags=["patients"])
-
-# ==========================
-# Auth Helper (Added by Nirojini)
-# ==========================
-def get_user_id(authorization: str | None = Header(default=None)) -> int:
-    if not authorization or not authorization.lower().startswith("bearer "):
-        return 0 # anonymous
-    try:
-        token = authorization.split()[1]
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        return int(payload.get("sub"))
-    except:
-        return 0
 
 # ==========================
 # 1. OCR ENDPOINT (Added by Shameeha)
@@ -81,7 +69,12 @@ async def extract_medical_report(file: UploadFile = File(...)):
 # Create (Accepts both /patients and /patients/ with Audit Logging)
 @router.post("", response_model=PatientResponse)
 @router.post("/", response_model=PatientResponse, include_in_schema=False)
-def create_patient(body: PatientCreate, request: Request, db: Session = Depends(get_db), user_id: int = Depends(get_user_id)):
+def create_patient(
+    body: PatientCreate,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
     db_patient = db.query(Patient).filter(Patient.hospital_id == body.hospital_id).first()
     if db_patient:
         raise HTTPException(status_code=400, detail="Patient with this Hospital ID already exists")
@@ -92,19 +85,19 @@ def create_patient(body: PatientCreate, request: Request, db: Session = Depends(
     db.refresh(new_patient)
     
     # Audit Log added by Nirojini
-    log_event(db, "Patient Record Created", user_id=user_id, ip=request.client.host, details=f"Created ID: {body.hospital_id}")
+    log_event(db, "Patient Record Created", user_id=current_user.id, ip=request.client.host, details=f"Created ID: {body.hospital_id}")
     
     return new_patient
 
 # Read All
 @router.get("", response_model=List[PatientResponse])
 @router.get("/", response_model=List[PatientResponse], include_in_schema=False)
-def get_all_patients(db: Session = Depends(get_db)):
+def get_all_patients(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
     return db.query(Patient).order_by(Patient.id.desc()).all()
 
 # Read One
 @router.get("/{patient_id}", response_model=PatientResponse)
-def get_patient(patient_id: int, db: Session = Depends(get_db)):
+def get_patient(patient_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
     patient = db.query(Patient).filter(Patient.id == patient_id).first()
     if not patient:
         raise HTTPException(status_code=404, detail="Patient not found")
@@ -115,7 +108,13 @@ def get_patient(patient_id: int, db: Session = Depends(get_db)):
 
 # Update
 @router.put("/{patient_id}", response_model=PatientResponse)
-def update_patient(patient_id: int, body: PatientUpdate, request: Request, db: Session = Depends(get_db), user_id: int = Depends(get_user_id)):
+def update_patient(
+    patient_id: int,
+    body: PatientUpdate,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
     db_patient = db.query(Patient).filter(Patient.id == patient_id).first()
     if not db_patient:
         raise HTTPException(status_code=404, detail="Patient not found")
@@ -128,13 +127,18 @@ def update_patient(patient_id: int, body: PatientUpdate, request: Request, db: S
     db.refresh(db_patient)
     
     # Audit Log (Nirojini's feature)
-    log_event(db, "Patient Record Updated", user_id=user_id, ip=request.client.host, details=f"Updated ID: {db_patient.hospital_id}")
+    log_event(db, "Patient Record Updated", user_id=current_user.id, ip=request.client.host, details=f"Updated ID: {db_patient.hospital_id}")
     
     return db_patient
 
 # Delete
 @router.delete("/{patient_id}")
-def delete_patient(patient_id: int, request: Request, db: Session = Depends(get_db), user_id: int = Depends(get_user_id)):
+def delete_patient(
+    patient_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
     db_patient = db.query(Patient).filter(Patient.id == patient_id).first()
     if not db_patient:
         raise HTTPException(status_code=404, detail="Patient not found")
@@ -144,7 +148,7 @@ def delete_patient(patient_id: int, request: Request, db: Session = Depends(get_
     db.commit()
     
     # Audit Log (Nirojini's feature)
-    log_event(db, "Patient Record Deleted", user_id=user_id, ip=request.client.host, details=f"Deleted ID: {deleted_hospital_id}")
+    log_event(db, "Patient Record Deleted", user_id=current_user.id, ip=request.client.host, details=f"Deleted ID: {deleted_hospital_id}")
     
     # JSON response (Shameeha's feature)
     return {"message": "Patient deleted"}
