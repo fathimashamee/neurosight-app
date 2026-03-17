@@ -3,7 +3,7 @@
 venv/
 __pycache__/
 *.pyc
-backend/.env
+backend/.venv/
 
 # Node / React
 frontend/node_modules/
@@ -13,6 +13,9 @@ build/
 # Data / Models
 backend/models/*.h5
 backend/uploads/
+uploaded_docs/
+uploaded_mris/
+uploads/
 
 # IDE / System
 .vscode/
