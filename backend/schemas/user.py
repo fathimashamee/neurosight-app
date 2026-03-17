@@ -34,6 +34,12 @@ class UserUpdate(BaseModel):
     role: str | None = None
     status: bool | None = None
 
+class SelfUpdate(BaseModel):
+    name: str | None = None
+    mobile: str | None = None
+    current_password: str | None = None
+    new_password: str | None = None
+
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
