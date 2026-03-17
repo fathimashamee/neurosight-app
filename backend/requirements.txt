@@ -9,6 +9,8 @@ passlib[bcrypt]==1.7.4
 python-jose[cryptography]
 Pillow
 numpy
+pytesseract
+PyMuPDF
 pydantic-settings
 email-validator
 tensorflow
