@@ -73,7 +73,7 @@ from backend.core.detector import get_model_readiness
 from backend.db.database import Base, engine
 
 # All Routers combined into a clean list
-from backend.routers import auth, results, dashboard, patients, documents
+from backend.routers import auth, results, dashboard, patients, documents, treatment_plans
 
 app = FastAPI(title="Brain Tumor Detection API")
 
@@ -102,6 +102,7 @@ app.include_router(results.router)
 app.include_router(dashboard.router)
 app.include_router(patients.router)
 app.include_router(documents.router)
+app.include_router(treatment_plans.router)
 
 @app.get("/health")
 def health():

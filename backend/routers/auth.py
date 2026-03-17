@@ -10,7 +10,7 @@ from urllib.parse import quote
 from backend.db.database import get_db
 from backend.core.config import settings
 from backend.models.user import User
-from backend.schemas.user import UserCreate, UserLogin, UserRead, UserUpdate, Token
+from backend.schemas.user import UserCreate, UserLogin, UserRead, UserUpdate, SelfUpdate, Token
 from backend.core.email_utils import create_password_reset_token, get_user_by_password_reset_token, send_welcome_email
 from backend.core.audit import log_event
 from backend.core.security import get_current_active_user, get_current_user, normalize_role, require_admin
@@ -104,6 +104,26 @@ def set_password(body: SetPasswordRequest, request: Request, db: Session = Depen
 
 @router.get("/me", response_model=UserRead)
 def me(current_user: User = Depends(get_current_user)):
+    return current_user
+
+@router.put("/me", response_model=UserRead)
+def update_me(
+    body: SelfUpdate,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    if body.name is not None:
+        current_user.name = body.name
+    if body.mobile is not None:
+        current_user.mobile = body.mobile
+    if body.new_password:
+        if not body.current_password or not pwd_ctx.verify(body.current_password, current_user.password_hash):
+            raise HTTPException(status_code=400, detail="Current password is incorrect")
+        current_user.password_hash = pwd_ctx.hash(body.new_password)
+    db.commit()
+    db.refresh(current_user)
+    log_event(db, "Profile Updated", user_id=current_user.id, ip=request.client.host if request.client else "unknown", details="User updated own profile")
     return current_user
 
 @router.get("/users", response_model=list[UserRead])

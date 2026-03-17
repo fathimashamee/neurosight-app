@@ -17,6 +17,7 @@ class Document(Base):
     original_name = Column(String)
     saved_name = Column(String)
     doc_type = Column(String)
+    description = Column(String, nullable=True)
     upload_date = Column(String)
 
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -28,6 +29,7 @@ os.makedirs(DOCS_DIR, exist_ok=True)
 async def upload_document(
     patient_id: int = Form(...),
     doc_type: str = Form("Clinical Report"),
+    description: str = Form(""),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
@@ -44,6 +46,7 @@ async def upload_document(
         original_name=file.filename,
         saved_name=safe_name,
         doc_type=doc_type,
+        description=description,
         upload_date=date.today().isoformat()
     )
     db.add(new_doc)
