@@ -109,8 +109,10 @@ Documentation: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 
    ```bash
    cd ..
-   python -m uvicorn backend.main:app --reload --port 8000
+   npm run dev
    ```
+
+   This runs the backend through the root script and uses `backend/.venv` automatically.
 
 ---
 
@@ -191,7 +193,7 @@ Final project/
 2. **Run the backend**:
 
    ```bash
-   python -m uvicorn backend.main:app --reload --port 8000
+   npm run dev
    ```
 3. **Run the frontend**:
 
