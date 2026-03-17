@@ -7,12 +7,12 @@ import AllPatients from "./components/pages/dashboard/Components/AllPatients";
 import AddNewPatient from "./components/pages/dashboard/Components/AddNewPatient";
 import UploadMRI from "./components/pages/dashboard/Components/UploadMRI";
 import ClassificationResults from "./components/pages/dashboard/Components/ClassificationResults";
-import UploadReport from "./components/pages/dashboard/Components/UploadReport";
-import ReportHistory from "./components/pages/dashboard/Components/ReportHistory";
 import AuditLogs from "./components/pages/dashboard/Components/AuditLogs";
 import UserRoles from "./components/pages/dashboard/Components/UserRoles";
 import AllStaffs from "./components/pages/dashboard/Components/AllStaffs";
 import AddNewStaff from "./components/pages/dashboard/Components/AddNewStaff";
+import PersonalizedSettings from "./components/pages/dashboard/Components/PersonalizedSettings";
+import TreatmentPlan from "./components/pages/dashboard/Components/TreatmentPlan";
 import ResultViewer from "./components/ResultViewer";
 import { clearAuth, fetchCurrentUser, getCurrentUser, getToken } from "./util";
 
@@ -90,10 +90,6 @@ export default function App() {
                 <Route path="upload" element={<UploadMRI />} />
                 <Route path="results" element={<ClassificationResults />} />
               </Route>
-              <Route path="reports">
-                <Route path="upload" element={<UploadReport />} />
-                <Route path="history" element={<ReportHistory />} />
-              </Route>
               <Route path="system">
                 <Route
                   path="audit-logs"
@@ -131,6 +127,8 @@ export default function App() {
                 />
               </Route>
               <Route path="results/:id" element={<ResultViewer />} />
+              <Route path="settings" element={<PersonalizedSettings />} />
+              <Route path="treatment-plans" element={<TreatmentPlan />} />
             </Route>
             <Route path="/forbidden" element={<Forbidden />} />
             <Route path="/login" element={<Navigate to="/" replace />} />

@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
+import { api } from "../../../util";
 
 // Standardized Corporate SVG Icons
 const Icons = {
@@ -43,11 +44,19 @@ function Sidebar({ collapsed, role, onLogout }) {
           <NavItem to="/patients/new" label="Add New Patient" Icon={Icons.Add} />
         </div>
 
+        {/* TREATMENT SECTION: Clinician only */}
+        {role === "Clinician" && (
+          <div>
+            <div className={`mb-2 px-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ${collapsed ? 'hidden' : 'block'}`}>Treatment</div>
+            <NavItem to="/treatment-plans" label="Treatment Plans" Icon={Icons.Records} />
+          </div>
+        )}
+
         {/* IMAGE ANALYSIS SECTION */}
         <div>
           <div className={`mb-2 px-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ${collapsed ? 'hidden' : 'block'}`}>Image Analysis</div>
           <NavItem to="/image/upload" label="Upload MRI" Icon={Icons.AI} />
-          <NavItem to="/image/results" label="Classification Results" Icon={Icons.AI} />
+          <NavItem to="/image/results" label="Classification Results" Icon={Icons.Records} />
         </div>
 
 
@@ -73,7 +82,6 @@ function Sidebar({ collapsed, role, onLogout }) {
         <div>
           <div className={`mb-2 px-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ${collapsed ? 'hidden' : 'block'}`}>User Preferences</div>
           <NavItem to="/settings" label="Personalized Settings" Icon={Icons.Settings} />
-          <NavItem to="/notifications" label="Notifications" Icon={Icons.Notification} />
 
           {/* LOGOUT BUTTON */}
           <button
@@ -91,7 +99,58 @@ function Sidebar({ collapsed, role, onLogout }) {
 
 export default function Dashboard({ onLogout, user }) {
   const [collapsed, setCollapsed] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+
+  /* ── Search state ── */
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [showDrop, setShowDrop] = useState(false);
+  const searchRef = useRef(null);
+  const timer = useRef(null);
+
   const navigate = useNavigate();
+  const location = useLocation();
+
+  /* close search drop on outside click */
+  useEffect(() => {
+    const handler = (e) => {
+      if (searchRef.current && !searchRef.current.contains(e.target)) setShowDrop(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  /* live search: patients + staff */
+  const handleSearch = (e) => {
+    const val = e.target.value;
+    setQuery(val);
+    clearTimeout(timer.current);
+    if (!val.trim()) { setResults([]); setShowDrop(false); return; }
+    setSearching(true);
+    setShowDrop(true);
+    timer.current = setTimeout(async () => {
+      try {
+        const [patients, staff] = await Promise.all([
+          api("/patients").catch(() => []),
+          api("/auth/users").catch(() => []),
+        ]);
+        const q = val.toLowerCase();
+        const pMatches = (Array.isArray(patients) ? patients : [])
+          .filter(p => (p.name || "").toLowerCase().includes(q) || (p.hospital_id || "").toLowerCase().includes(q))
+          .slice(0, 5)
+          .map(p => ({ type: "Patient", label: p.name, sub: p.hospital_id || "—", link: "/patients" }));
+        const sMatches = (Array.isArray(staff) ? staff : [])
+          .filter(s => (s.name || "").toLowerCase().includes(q) || (s.email || "").toLowerCase().includes(q))
+          .slice(0, 3)
+          .map(s => ({ type: "Staff", label: s.name || s.email, sub: s.role || "—", link: "/staff" }));
+        setResults([...pMatches, ...sMatches]);
+      } catch { setResults([]); }
+      finally { setSearching(false); }
+    }, 350);
+  };
+
+  const clearSearch = () => { setQuery(""); setResults([]); setShowDrop(false); };
 
   const handleLogout = () => {
     if (window.confirm("Are you sure you want to logout?")) {
@@ -100,47 +159,167 @@ export default function Dashboard({ onLogout, user }) {
     }
   };
 
+  const ROUTE_LABELS = {
+    "/": "Dashboard Overview",
+    "/patients": "All Patients",
+    "/patients/new": "Add New Patient",
+    "/image/upload": "Upload MRI",
+    "/image/results": "Classification Results",
+    "/treatment-plans": "Treatment Plans",
+    "/staff": "Staff Records",
+    "/staff/new": "Add New Staff",
+    "/system/audit-logs": "Audit Logs",
+    "/settings": "Personalized Settings",
+  };
+  const pageLabel = ROUTE_LABELS[location.pathname] || "Dashboard";
+
+  const today = new Date().toLocaleDateString("en-GB", { weekday: "short", year: "numeric", month: "short", day: "numeric" });
+  const initials = (user?.name || user?.email || "?").split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase();
+
   return (
     <div className="flex min-h-screen bg-white">
       <Sidebar collapsed={collapsed} role={user?.role} onLogout={handleLogout} />
 
       <div className="flex-1 flex flex-col">
-        {/* Professional Top Header */}
-        <header className="h-16 border-b flex items-center justify-between px-8 bg-white sticky top-0 z-40">
-          <button onClick={() => setCollapsed(!collapsed)} className="p-2 rounded-lg text-slate-400 hover:bg-slate-50 hover:text-slate-900 transition-all">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
-          </button>
+        {/* ── Top Header ── */}
+        <header className="h-16 border-b flex items-center justify-between px-6 bg-white sticky top-0 z-40 shadow-sm">
 
-          <div className="flex items-center gap-6">
-            {/* Global Search Bar */}
-            <div className="hidden md:flex items-center bg-slate-50 border border-slate-100 rounded-xl px-4 py-1.5 gap-3">
-              <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-              <input className="bg-transparent border-none outline-none text-xs w-64" placeholder="Search Hospital ID or Staff Name..." />
+          {/* Left: hamburger + page label */}
+          <div className="flex items-center gap-4 flex-shrink-0">
+            <button
+              onClick={() => setCollapsed(!collapsed)}
+              className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-800 transition-all"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+            <div className="hidden sm:block h-5 w-px bg-slate-200" />
+            <div className="hidden sm:flex flex-col">
+              <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-widest leading-none">NeuroSight AI</span>
+              <span className="text-sm font-bold text-slate-800 leading-tight mt-0.5">{pageLabel}</span>
+            </div>
+          </div>
+
+          {/* Centre: Search bar */}
+          <div className="flex-1 max-w-md mx-6 relative" ref={searchRef}>
+            <div className={`flex items-center bg-slate-50 border rounded-xl px-3 py-2 gap-2 transition-all ${showDrop || query ? "border-indigo-300 bg-white shadow-sm" : "border-slate-200"}`}>
+              <svg className="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                className="bg-transparent border-none outline-none text-sm flex-1 placeholder:text-slate-400"
+                placeholder="Search patient name, hospital ID or staff…"
+                value={query}
+                onChange={handleSearch}
+                onFocus={() => { if (query.trim()) setShowDrop(true); }}
+              />
+              {searching && (
+                <svg className="w-4 h-4 text-indigo-400 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                </svg>
+              )}
+              {query && !searching && (
+                <button onClick={clearSearch} className="text-slate-400 hover:text-slate-600 text-lg leading-none flex-shrink-0">×</button>
+              )}
             </div>
 
-            {/* Notification Badge */}
-            <div className="relative cursor-pointer text-slate-400 hover:text-slate-900 transition-all">
-              <Icons.Notification />
-              <span className="absolute -top-1 -right-1 bg-red-500 w-2.5 h-2.5 rounded-full border-2 border-white"></span>
+            {/* Search dropdown */}
+            {showDrop && query.trim() && (
+              <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden z-50">
+                {searching ? (
+                  <div className="px-4 py-5 text-center text-xs text-slate-400">Searching…</div>
+                ) : results.length === 0 ? (
+                  <div className="px-4 py-5 text-center">
+                    <p className="text-sm text-slate-500 font-medium">No results for "{query}"</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Try a different name or Hospital ID</p>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="px-4 py-2 bg-slate-50 border-b border-slate-100">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{results.length} result{results.length !== 1 ? "s" : ""}</span>
+                    </div>
+                    {results.map((r, i) => (
+                      <button
+                        key={i}
+                        onClick={() => { navigate(r.link); clearSearch(); }}
+                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left border-b border-slate-50 last:border-0"
+                      >
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm flex-shrink-0 ${r.type === "Patient" ? "bg-blue-50 text-blue-600" : "bg-emerald-50 text-emerald-600"}`}>
+                          {r.type === "Patient" ? "🧑‍⚕️" : "👤"}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-slate-800 truncate">{r.label}</p>
+                          <p className="text-xs text-slate-400">{r.sub} · {r.type}</p>
+                        </div>
+                        <svg className="w-4 h-4 text-slate-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                        </svg>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Right: date + user profile */}
+          <div className="flex items-center gap-3 flex-shrink-0">
+            {/* Date pill */}
+            <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl text-xs text-slate-500 font-medium">
+              <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              {today}
             </div>
 
-            <div className="h-8 w-[1px] bg-slate-200 mx-2"></div>
+            <div className="h-6 w-px bg-slate-200" />
 
-            <div className="flex items-center gap-3">
-              <div className="flex flex-col text-right">
-                <span className="text-[11px] font-black text-slate-900 uppercase tracking-tight leading-none">
-                  {user ? (user.name || user.username || user.role) : "Loading..."}
-                </span>
-                <span className="text-[9px] text-blue-600 font-bold uppercase tracking-widest mt-1">
-                  {user ? user.role : "..."}
-                </span>
-              </div>
-              <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center font-bold text-white shadow-lg shadow-slate-200 border-2 border-white">
-                {user && (user.name || user.username) ? (user.name || user.username).charAt(0).toUpperCase() : "?"}
-              </div>
+            {/* User profile dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setProfileOpen(!profileOpen)}
+                className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 transition-all"
+              >
+                <div className="w-7 h-7 rounded-lg bg-slate-900 flex items-center justify-center text-white text-xs font-black">
+                  {initials}
+                </div>
+                <div className="hidden md:flex flex-col text-left">
+                  <span className="text-xs font-bold text-slate-800 leading-none">{user?.name || user?.email || "—"}</span>
+                  <span className="text-[10px] text-indigo-600 font-semibold leading-tight mt-0.5">{user?.role}</span>
+                </div>
+                <svg className={`w-3.5 h-3.5 text-slate-400 transition-transform ${profileOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {profileOpen && (
+                <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 overflow-hidden">
+                  <div className="px-4 py-3 bg-slate-50 border-b border-slate-100">
+                    <p className="text-sm font-bold text-slate-800">{user?.name || "—"}</p>
+                    <p className="text-xs text-slate-400 truncate">{user?.email}</p>
+                    <span className="inline-block mt-1.5 px-2 py-0.5 bg-indigo-100 text-indigo-700 text-[10px] font-bold rounded-full">{user?.role}</span>
+                  </div>
+                  <div className="py-1.5">
+                    <button
+                      onClick={() => { setProfileOpen(false); handleLogout(); }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-all font-medium"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                      </svg>
+                      Logout
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </header>
+
+        {/* overlay to close profile dropdown */}
+        {profileOpen && <div className="fixed inset-0 z-40" onClick={() => setProfileOpen(false)} />}
 
         <main className="p-8 overflow-y-auto bg-slate-50/20 flex-1">
           <Outlet context={{ user }} />
