@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Request, Form
 from sqlalchemy.orm import Session
-import os
 import uuid
 import shutil
 import logging
@@ -19,6 +18,52 @@ from backend.models.user import User
 router = APIRouter(prefix="/results", tags=["results"])
 logger = logging.getLogger(__name__)
 
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/bmp", "image/tiff"}
+
+
+# ==========================================================
+# 1. Standalone Inference Endpoint (no DB write)
+# ==========================================================
+@router.post("/predict-tumour")
+async def predict_tumour(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Accept an MRI image, run the full ensemble pipeline, return class + confidence."""
+    if file.content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type '{file.content_type}'. Upload a JPEG, PNG, BMP, TIFF, or WebP image.",
+        )
+
+    uploads = Path(settings.UPLOAD_DIR)
+    uploads.mkdir(parents=True, exist_ok=True)
+
+    ext = file.filename.rsplit(".", 1)[-1] if file.filename and "." in file.filename else "jpg"
+    tmp_path = uploads / f"tmp_{uuid.uuid4()}.{ext}"
+
+    try:
+        with tmp_path.open("wb") as f:
+            shutil.copyfileobj(file.file, f)
+
+        label, confidence = predict(str(tmp_path))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    except Exception as exc:
+        logger.error(f"Inference failed: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Inference failed. Check server logs.")
+    finally:
+        if tmp_path.exists():
+            tmp_path.unlink(missing_ok=True)
+
+    return {
+        "predicted_class":    label,
+        "confidence":         round(confidence, 4),
+        "confidence_percent": f"{confidence * 100:.2f}%",
+    }
+
 # ==========================================================
 # 2. The Combined Upload & Analyze Endpoint
 # ==========================================================
@@ -30,6 +75,12 @@ def upload_scan(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
+    if file.content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type '{file.content_type}'. Upload a JPEG, PNG, BMP, TIFF, or WebP image.",
+        )
+
     # 1. Verify patient exists (Shameeha)
     patient = db.query(Patient).filter(Patient.id == patient_id).first()
     if not patient:
@@ -40,10 +91,10 @@ def upload_scan(
     uploads.mkdir(parents=True, exist_ok=True)
 
     # 3. Securely save file using unique UUID (Combined)
-    file_extension = file.filename.split(".")[-1] if file.filename else "jpg"
+    file_extension = file.filename.split(".")[-1] if file.filename and "." in file.filename else "jpg"
     safe_filename = f"{uuid.uuid4()}.{file_extension}"
     dst = uploads / safe_filename
-    
+
     with dst.open("wb") as f:
         shutil.copyfileobj(file.file, f)
 
@@ -51,7 +102,12 @@ def upload_scan(
     try:
         label, conf = predict(str(dst))
     except RuntimeError as exc:
+        dst.unlink(missing_ok=True)
         raise HTTPException(status_code=503, detail=str(exc))
+    except Exception as exc:
+        dst.unlink(missing_ok=True)
+        logger.error(f"Inference failed: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Inference failed. Check server logs.")
 
     # 5. Save the classification result to the database (Combined)
     result = Result(
@@ -103,61 +159,4 @@ def get_result(result_id: int, db: Session = Depends(get_db), current_user: User
 def get_patient_results(patient_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
     results = db.query(Result).filter(Result.patient_id == patient_id).order_by(Result.created_at.desc()).all()
     return results
-# Ensure an upload directory exists for storing the MRI images
-UPLOAD_DIR = "uploaded_mris"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-@router.post("/analyze")
-async def analyze_and_save_mri(
-    patient_id: int = Form(...),
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
-):
-    # 1. Verify the patient actually exists
-    patient = db.query(Patient).filter(Patient.id == patient_id).first()
-    if not patient:
-        raise HTTPException(status_code=404, detail="Patient not found")
-
-    # 2. Securely save the uploaded image to the server
-    file_extension = file.filename.split(".")[-1]
-    safe_filename = f"{uuid.uuid4()}.{file_extension}" # Gives it a unique, random name
-    file_path = os.path.join(UPLOAD_DIR, safe_filename)
-    
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-
-    # ==========================================
-    # 3. RUN YOUR AI MODEL HERE!
-    # Note: Replace this block with your actual loaded .h5 model prediction logic
-    # ==========================================
-    predicted_label = "Meningioma"  # <-- Example AI output
-    confidence_score = 94.5         # <-- Example AI confidence
-    # ==========================================
-
-    # 4. Save the classification result to the database
-    new_result = Result(
-        patient_id=patient_id,
-        user_id=current_user.id,
-        filename=safe_filename,
-        predicted_label=predicted_label,
-        confidence=confidence_score
-    )
-    db.add(new_result)
-    
-    # 5. Automatically update the Patient's main profile with the new findings!
-    patient.tumour_type = predicted_label
-    patient.risk_score = f"{confidence_score}%"
-    
-    db.commit()
-    db.refresh(new_result)
-    db.refresh(patient)
-    
-    return {
-        "message": "MRI Analyzed and Saved Successfully",
-        "result_id": new_result.id,
-        "predicted_label": new_result.predicted_label,
-        "confidence": new_result.confidence,
-        "saved_filename": safe_filename
-    }
 

@@ -14,7 +14,7 @@ PyMuPDF
 pydantic-settings
 email-validator
 tensorflow
-
-# If you have a real model: onnxruntime OR torch (choose one)
-# onnxruntime
-# torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+scikit-learn
+xgboost
+opencv-python-headless
+PyWavelets

@@ -16,6 +16,7 @@ backend/uploads/
 uploaded_docs/
 uploaded_mris/
 uploads/
+tumor_models/
 
 # IDE / System
 .vscode/
