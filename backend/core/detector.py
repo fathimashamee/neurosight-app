@@ -183,6 +183,16 @@ def _load_all():
                 custom_objects=_CUSTOM_OBJECTS,
                 safe_mode=False,
             )
+            try:
+                bottleneck_out = _keras_model.get_layer("relu_bottleneck").output
+                _keras_model = tf.keras.Model(
+                    inputs=_keras_model.inputs,
+                    outputs=[_keras_model.output, bottleneck_out],
+                    name="WaveFusionNet_dual",
+                )
+                logger.info("Dual-output model ready (softmax + 256-d bottleneck).")
+            except ValueError:
+                logger.warning("'relu_bottleneck' layer not found — ensemble will use softmax-only fallback.")
         if _svm_clf is None:
             with open(SVM_PATH, "rb") as f:
                 _svm_clf = pickle.load(f)

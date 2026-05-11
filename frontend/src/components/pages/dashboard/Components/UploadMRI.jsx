@@ -78,7 +78,8 @@ const UploadMRI = () => {
         const data = await api("/results/upload", {
             method: "POST",
             body: formData,
-            isForm: true
+            isForm: true,
+            timeoutMs: 120000,
         });
         
         clearInterval(interval);

@@ -61,21 +61,36 @@
 
 # ====================================================================================================
 
+from contextlib import asynccontextmanager
+import asyncio
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-# System and FastAPI imports added by Shameeha
 import os
 from fastapi.staticfiles import StaticFiles
 
-# Config and Database imports (Combined)
 from backend.core.config import settings, CORS_ORIGINS
 from backend.core.detector import get_model_readiness
 from backend.db.database import Base, engine
 
-# All Routers combined into a clean list
 from backend.routers import auth, results, dashboard, patients, documents, treatment_plans
 
-app = FastAPI(title="Brain Tumor Detection API")
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    loop = asyncio.get_event_loop()
+    try:
+        logger.info("Preloading ML models at startup…")
+        await loop.run_in_executor(None, lambda: get_model_readiness(load=True))
+        logger.info("ML models ready.")
+    except Exception as exc:
+        logger.warning(f"Model preload failed: {exc}")
+    yield
+
+
+app = FastAPI(title="Brain Tumor Detection API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
