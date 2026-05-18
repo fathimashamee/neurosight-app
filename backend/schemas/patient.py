@@ -10,6 +10,8 @@ class PatientBase(BaseModel):
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
     address: Optional[str] = None
+    from_location: Optional[str] = None
+    occupation: Optional[str] = None
     symptoms: Optional[str] = None
     presenting_complaint: Optional[str] = None
     symptom_analysis: Optional[str] = None
@@ -42,6 +44,8 @@ class PatientUpdate(BaseModel):
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
     address: Optional[str] = None
+    from_location: Optional[str] = None
+    occupation: Optional[str] = None
     symptoms: Optional[str] = None
     presenting_complaint: Optional[str] = None
     symptom_analysis: Optional[str] = None

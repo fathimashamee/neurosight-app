@@ -75,6 +75,8 @@ def update_db():
             ("muscle_power",          "TEXT"),
             ("reflex",                "TEXT"),
             ("assigned_doctor_id",    "INTEGER REFERENCES users(id) ON DELETE SET NULL"),
+            ("from_location",         "VARCHAR(100)"),
+            ("occupation",            "VARCHAR(100)"),
         ])
 
         # Drop old string-based assigned_doctor column if it still exists
