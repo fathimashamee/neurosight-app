@@ -1,9 +1,8 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&family=Syne:wght@700;800&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&family=Syne:wght@700;800&display=swap');
 
 /* ─── ROOT HEIGHT ─── */
 html, body, #root {
@@ -11,7 +10,6 @@ html, body, #root {
   margin: 0;
   padding: 0;
 }
-
 
 
 /* ─── NEUROSIGHT DESIGN SYSTEM — Slate & Teal ─── */
