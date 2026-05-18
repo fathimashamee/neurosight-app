@@ -15,7 +15,9 @@ class Patient(Base):
     email = Column(String(100))
     phone = Column(String(50))
     address = Column(String(255)) # Kept Shameeha's longer 255 limit
-    
+    from_location = Column(String(100), nullable=True)
+    occupation = Column(String(100), nullable=True)
+
     # Medical Information
     symptoms = Column(Text)
     presenting_complaint = Column(Text, nullable=True)  # doctor's formal write-up
