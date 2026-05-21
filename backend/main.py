@@ -81,6 +81,8 @@ import backend.models.result      # noqa: F401
 import backend.models.patient     # noqa: F401
 import backend.models.audit_log   # noqa: F401
 import backend.models.caretaker   # noqa: F401
+import backend.models.checkin     # noqa: F401
+import backend.models.chat_message # noqa: F401
 
 from backend.routers import auth, results, dashboard, patients, documents, treatment_plans, admissions, mobile
 from backend.update_db import update_db
