@@ -90,7 +90,7 @@ def create_patient(
     if db_patient:
         raise HTTPException(status_code=400, detail="Patient with this Hospital ID already exists")
 
-    patient_data = body.model_dump(exclude={"caretaker_name", "caretaker_phone"})
+    patient_data = body.model_dump(exclude={"caretaker_name", "caretaker_phone", "caretaker_relation"})
     new_patient = Patient(**patient_data)
     db.add(new_patient)
     db.flush()  # get new_patient.id without committing

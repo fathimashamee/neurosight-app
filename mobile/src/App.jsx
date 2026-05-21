@@ -8,6 +8,9 @@ import LanguageSelect from './screens/LanguageSelect'
 import Login from './screens/Login'
 import Home from './screens/Home'
 import Setup from './screens/Setup'
+import CheckIn from './screens/CheckIn'
+import Result from './screens/Result'
+import Chat from './screens/Chat'
 
 function ComingSoon({ title }) {
   const navigate = useNavigate()
@@ -80,9 +83,9 @@ export default function App() {
               <Route path="/home"      element={<Home />} />
               <Route path="/report"    element={<ComingSoon title="My Report" />} />
               <Route path="/education" element={<ComingSoon title="About My Condition" />} />
-              <Route path="/checkin"   element={<ComingSoon title="Daily Check-in" />} />
-              <Route path="/result"    element={<ComingSoon title="Check-in Result" />} />
-              <Route path="/chat"      element={<ComingSoon title="Ask Questions" />} />
+              <Route path="/checkin"   element={<CheckIn />} />
+              <Route path="/result"    element={<Result />} />
+              <Route path="/chat"      element={<Chat />} />
               <Route path="/symptom"   element={<ComingSoon title="Report Symptom" />} />
               <Route path="/emergency" element={<ComingSoon title="Emergency" />} />
             </Routes>
