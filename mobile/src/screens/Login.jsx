@@ -105,8 +105,8 @@ export default function Login() {
           ))}
         </div>
 
-        <div style={{ animation:'fadeUp 0.4s ease both' }}>
-          <div style={{ width:48, height:48, borderRadius:13, background:'rgba(255,255,255,0.18)', border:'1px solid rgba(255,255,255,0.3)', display:'flex', alignItems:'center', justifyContent:'center', marginBottom:14 }}>
+        <div style={{ animation:'fadeUp 0.4s ease both', display:'flex', flexDirection:'column', alignItems:'center', textAlign:'center' }}>
+          <div style={{ width:48, height:48, borderRadius:13, background:'rgba(255,255,255,0.18)', border:'1px solid rgba(255,255,255,0.3)', display:'flex', alignItems:'center', justifyContent:'center', marginBottom:14, marginLeft:'auto', marginRight:'auto' }}>
             {role === 'patient' ? (
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
@@ -121,8 +121,8 @@ export default function Login() {
               </svg>
             )}
           </div>
-          <h1 style={{ fontSize:22, fontWeight:800, color:'#fff', margin:'0 0 4px' }}>{tk.title}</h1>
-          <p style={{ fontSize:13, color:'rgba(255,255,255,0.75)', margin:0 }}>{tk.sub}</p>
+          <h1 style={{ fontSize:22, fontWeight:800, color:'#fff', margin:'0 0 4px', textAlign:'center' }}>{tk.title}</h1>
+          <p style={{ fontSize:13, color:'rgba(255,255,255,0.75)', margin:0, textAlign:'center' }}>{tk.sub}</p>
         </div>
       </div>
 
