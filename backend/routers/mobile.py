@@ -15,6 +15,7 @@ from backend.models.checkin import CheckIn
 from backend.models.patient import Patient
 from backend.models.result import Result
 from backend.routers.treatment_plans import TreatmentPlan
+from backend.chatbot.classifier import get_classifier
 
 router = APIRouter(prefix="/mobile", tags=["mobile"])
 
@@ -177,11 +178,9 @@ def _patient_context(db: Session, patient: Patient) -> dict:
 
     latest_scan = None
     if latest_result:
-        latest_scan = _safe_join([
-            latest_result.predicted_label,
-            f"confidence {latest_result.confidence:.1f}%" if latest_result.confidence is not None else None,
-            f"grade {latest_result.pathology_grade}" if latest_result.pathology_grade else None,
-        ])
+        label = latest_result.confirmed_label or latest_result.predicted_label
+        grade = f"Grade {latest_result.pathology_grade}" if latest_result.pathology_grade else None
+        latest_scan = _safe_join([label, grade])
 
     admission_info = _safe_join([
         f"episode {latest_admission.episode_number}" if latest_admission else None,
@@ -212,67 +211,58 @@ def _patient_context(db: Session, patient: Patient) -> dict:
     }
 
 
-def _answer_chat(message: str, context: dict) -> tuple[str, str, bool]:
-    lowered = message.lower().strip()
-    latest_checkin = context.get("latest_checkin")
+def _detect_language(text: str) -> str:
+    for ch in text:
+        cp = ord(ch)
+        if 0x0D80 <= cp <= 0x0DFF:
+            return "si"
+        if 0x0B80 <= cp <= 0x0BFF:
+            return "ta"
+    return "en"
 
-    if _has_emergency_language(lowered):
-        return (
-            "This sounds urgent. Call 1990 now or go to the nearest hospital right away.",
-            "emergency",
-            True,
+
+def _answer_chat(message: str, context: dict, language: str = "en") -> tuple[str, str, bool]:
+    """
+    Calls RAG microservice on port 8001.
+    Falls back to SVC classifier if microservice unavailable.
+    """
+    import httpx
+
+    # Try RAG microservice first
+    try:
+        response = httpx.post(
+            "http://127.0.0.1:8001/chat",
+            json={
+                "message": message,
+                "language": language,
+                "context": {
+                    "patient_name": context.get("patient_name", ""),
+                    "diagnosis": context.get("diagnosis", ""),
+                    "doctor": context.get("doctor", ""),
+                    "plan_summary": context.get("plan_summary", ""),
+                    "checkin_info": context.get("checkin_info", ""),
+                }
+            },
+            timeout=30.0
         )
+        if response.status_code == 200:
+            data = response.json()
+            return data["reply"], data["intent"], data["is_emergency"]
+    except Exception as e:
+        print(f"[Chat] RAG microservice unavailable: {e}, falling back to SVC")
 
-    if any(keyword in lowered for keyword in ["glioma", "tumour", "tumor", "diagnosis", "what do i have"]):
-        reply = _safe_join([
-            f"Your record shows {context['diagnosis']}.",
-            f"Your latest plan is {context['plan_summary']}" if context["plan_summary"] else None,
-            "Please ask your doctor to explain what this means for you personally.",
-        ], " ")
-        return reply, "diagnosis", False
+    # Fallback to existing SVC classifier
+    classifier = get_classifier()
+    if classifier is not None:
+        return classifier.answer(message, context)
 
-    if any(keyword in lowered for keyword in ["chemo", "chemotherapy", "side effects", "side effect"]):
-        reply = _safe_join([
-            "Common treatment side effects can include tiredness, nausea, poor appetite, and headache.",
-            f"Your current plan mentions {context['plan_summary']}" if context["plan_summary"] else None,
-            "Always ask your doctor before changing any medicine or dose.",
-        ], " ")
-        return reply, "treatment", False
-
-    if any(keyword in lowered for keyword in ["hospital", "go to hospital", "when should i go", "emergency", "worse"]):
-        reply = _safe_join([
-            "Go to hospital right away if you have a seizure, repeated vomiting, severe headache, confusion, weakness, trouble breathing, or a sudden change that worries you.",
-            f"Your latest check-in shows {context['checkin_info']}" if context["checkin_info"] else None,
-            "If you feel worse now, call 1990.",
-        ], " ")
-        return reply, "emergency", True
-
-    if any(keyword in lowered for keyword in ["eat", "food", "diet", "eat should", "what should i eat"]):
-        reply = _safe_join([
-            "Small meals, water, and soft foods are often easier when appetite is low.",
-            "Protein-rich foods can help if you can tolerate them, but avoid anything that makes nausea worse.",
-            "If symptoms continue, your doctor or dietitian should guide you.",
-        ], " ")
-        return reply, "nutrition", False
-
-    if any(keyword in lowered for keyword in ["pain", "hurt", "aching", "headache", "hip"]):
-        reply = _safe_join([
-            "Pain that is severe or getting worse should be reported to your care team.",
-            f"Your record shows {context['diagnosis']} and the latest treatment plan is {context['plan_summary']}" if context["plan_summary"] else f"Your record shows {context['diagnosis']}.",
-            "Please use the report symptom flow or contact your doctor.",
-        ], " ")
-        return reply, "symptom", False
-
-    reply = _safe_join([
-        f"Based on your record, your diagnosis is {context['diagnosis']}.",
-        f"Your current treatment plan is {context['plan_summary']}" if context["plan_summary"] else "No treatment plan is recorded yet.",
-        f"Your assigned doctor is {context['doctor']}." if context['doctor'] else "Please confirm the next step with your doctor.",
-    ], " ")
-    if latest_checkin and latest_checkin.level in {"RED", "CRITICAL"}:
-        reply = _safe_join([reply, f"Your latest check-in was {latest_checkin.level.lower()} with score {latest_checkin.score}."], " ")
-    reply = _safe_join([reply, "Please ask your doctor to confirm important treatment decisions."], " ")
-    return reply, "general", False
-
+    # Final fallback rule based
+    return (
+        f"Based on your record, your diagnosis is {context.get('diagnosis', 'unknown')}. "
+        "Please consult your doctor for more information.",
+        "general",
+        False,
+    )
 
 # ── dependency used by future authenticated mobile endpoints ─────────────────
 
@@ -600,7 +590,8 @@ def chat_reply(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Message is required")
 
     context = _patient_context(db, patient)
-    reply, topic, emergency = _answer_chat(message, context)
+    language = _detect_language(message)
+    reply, topic, emergency = _answer_chat(message, context, language)
 
     chat = ChatMessage(
         patient_id=patient.id,

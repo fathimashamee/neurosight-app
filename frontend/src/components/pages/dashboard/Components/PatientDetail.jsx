@@ -167,6 +167,8 @@ const PatientDetail = () => {
   const [expandedCheckin, setExpandedCheckin] = useState(null);
   const [monitoringSubTab, setMonitoringSubTab] = useState('checkin');
   const [planSaving, setPlanSaving] = useState(false);
+  const [chatHistory, setChatHistory] = useState([]);
+  const [chatLoading, setChatLoading] = useState(false);
   const [caretakers, setCaretakers] = useState([]);
   const [caretakerEdits, setCaretakerEdits] = useState({});
   const [caretakerUpdateSaving, setCaretakerUpdateSaving] = useState(null);
@@ -900,12 +902,174 @@ const PatientDetail = () => {
         )}
 
         {/* Chat history */}
-        {monitoringSubTab === 'chat' && (
-          <div style={{ padding: '28px 0', textAlign: 'center' }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8', marginBottom: 6 }}>No chat history yet</div>
-            <div style={{ fontSize: 11, color: '#cbd5e1' }}>Messages between the care team and patient will appear here.</div>
-          </div>
-        )}
+        {monitoringSubTab === 'chat' && (() => {
+          if (!chatHistory.length && !chatLoading) {
+            api(`/patients/${patient.id}/chat`).then(data => {
+              setChatHistory(Array.isArray(data) ? data : []);
+              setChatLoading(false);
+            }).catch(() => setChatLoading(false));
+            setChatLoading(true);
+          }
+
+          const emergencyCount = chatHistory.filter(m => m.emergency).length;
+
+          const TOPIC_CONFIG = {
+            emergency: { label: 'Emergency', bg: '#fef2f2', text: '#dc2626', border: '#fecaca' },
+            diagnosis: { label: 'Diagnosis', bg: '#f5f3ff', text: '#7c3aed', border: '#ddd6fe' },
+            treatment: { label: 'Treatment', bg: '#eff6ff', text: '#1d4ed8', border: '#bfdbfe' },
+            nutrition: { label: 'Nutrition', bg: '#f0fdf4', text: '#15803d', border: '#bbf7d0' },
+            symptom:   { label: 'Symptoms',  bg: '#fffbeb', text: '#b45309', border: '#fde68a' },
+            general:   { label: 'General',   bg: '#f8fafc', text: '#475569', border: '#e2e8f0' },
+          };
+
+          const fmtTime = dt => dt ? new Date(dt).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+          const fmtDate = dt => dt ? new Date(dt).toLocaleDateString('en-GB', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }) : '';
+
+          const groupByDate = (msgs) => {
+            const groups = [];
+            let lastKey = null;
+            msgs.forEach(msg => {
+              const key = msg.created_at ? new Date(msg.created_at).toDateString() : 'Unknown';
+              if (key !== lastKey) { groups.push({ dateLabel: fmtDate(msg.created_at), items: [] }); lastKey = key; }
+              groups[groups.length - 1].items.push(msg);
+            });
+            return groups;
+          };
+
+          const groups = groupByDate(chatHistory);
+
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+              {/* Stats */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                {[
+                  { label: 'Total',     value: chatHistory.length,                     bg: '#f8fafc', color: '#0f172a',  border: '#e2e8f0' },
+                  { label: 'Emergency', value: emergencyCount,                         bg: emergencyCount > 0 ? '#fef2f2' : '#f8fafc', color: emergencyCount > 0 ? '#dc2626' : '#94a3b8', border: emergencyCount > 0 ? '#fecaca' : '#e2e8f0' },
+                  { label: 'Normal',    value: chatHistory.filter(m => !m.emergency).length, bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0' },
+                ].map(s => (
+                  <div key={s.label} style={{ padding: '10px 12px', background: s.bg, border: `1px solid ${s.border}`, borderRadius: 10, textAlign: 'center' }}>
+                    <div style={{ fontSize: 20, fontWeight: 800, color: s.color, lineHeight: 1 }}>{s.value}</div>
+                    <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', color: s.color, opacity: 0.75, marginTop: 4, letterSpacing: '0.06em' }}>{s.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Emergency banner */}
+              {emergencyCount > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 8, background: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#dc2626' }}>{emergencyCount} emergency message{emergencyCount !== 1 ? 's' : ''} flagged in this conversation</div>
+                    <div style={{ fontSize: 10, color: '#ef4444', marginTop: 1 }}>Patient reported urgent symptoms. Please review the highlighted messages below.</div>
+                  </div>
+                </div>
+              )}
+
+              {/* Chat window */}
+              {chatLoading ? (
+                <div style={{ padding: '40px 0', textAlign: 'center' }}>
+                  <div style={{ width: 22, height: 22, border: '2px solid #e2e8f0', borderTopColor: '#0d9488', borderRadius: '50%', animation: 'chatSpin 0.8s linear infinite', margin: '0 auto 8px' }} />
+                  <div style={{ fontSize: 12, color: '#94a3b8' }}>Loading conversation…</div>
+                  <style>{`@keyframes chatSpin{to{transform:rotate(360deg)}}`}</style>
+                </div>
+              ) : chatHistory.length === 0 ? (
+                <div style={{ padding: '40px 20px', textAlign: 'center', background: '#f8fafc', borderRadius: 14, border: '1px dashed #e2e8f0' }}>
+                  <div style={{ width: 48, height: 48, borderRadius: 12, background: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" strokeWidth="1.8" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#64748b', marginBottom: 4 }}>No messages yet</div>
+                  <div style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.6 }}>When this patient uses the care assistant on their mobile app, the conversation will appear here.</div>
+                </div>
+              ) : (
+                <div style={{ background: '#eef2f7', borderRadius: 14, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+
+                  {/* Chat header bar */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: '#fff', borderBottom: '1px solid #e2e8f0' }}>
+                    <div style={{ width: 34, height: 34, borderRadius: 9, background: 'linear-gradient(135deg,#0d9488,#0f766e)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 0 0 2px rgba(13,148,136,0.18)' }}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08"/></svg>
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>NeuroSight Care Assistant</div>
+                      <div style={{ fontSize: 10, color: '#0d9488', marginTop: 1 }}>Conversation with {patient.name}</div>
+                    </div>
+                    <span style={{ fontSize: 10, fontWeight: 600, color: '#64748b', background: '#f1f5f9', padding: '3px 9px', borderRadius: 20, border: '1px solid #e2e8f0', flexShrink: 0 }}>{chatHistory.length} message{chatHistory.length !== 1 ? 's' : ''}</span>
+                  </div>
+
+                  {/* Message scroll area */}
+                  <div style={{ maxHeight: 500, overflowY: 'auto', padding: '16px 14px 10px', display: 'flex', flexDirection: 'column', gap: 0 }}>
+                    {groups.map((group, gi) => (
+                      <div key={gi}>
+                        {/* Date divider */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: gi === 0 ? '0 0 16px' : '8px 0 16px' }}>
+                          <div style={{ flex: 1, height: 1, background: '#d1d5db' }} />
+                          <span style={{ fontSize: 10, fontWeight: 600, color: '#6b7280', background: '#dce3ec', padding: '3px 11px', borderRadius: 20, whiteSpace: 'nowrap' }}>{group.dateLabel}</span>
+                          <div style={{ flex: 1, height: 1, background: '#d1d5db' }} />
+                        </div>
+
+                        {group.items.map(msg => {
+                          const tc = TOPIC_CONFIG[msg.topic] || TOPIC_CONFIG.general;
+                          const isEmergency = msg.emergency;
+                          return (
+                            <div key={msg.id} style={{ marginBottom: 20 }}>
+
+                              {/* Emergency strip */}
+                              {isEmergency && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, padding: '5px 11px', background: '#dc2626', borderRadius: 8 }}>
+                                  <svg width="11" height="11" viewBox="0 0 24 24" fill="white"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
+                                  <span style={{ fontSize: 10, fontWeight: 800, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Emergency Message</span>
+                                </div>
+                              )}
+
+                              {/* Topic + timestamp row */}
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, padding: '0 2px' }}>
+                                <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', padding: '2px 9px', borderRadius: 20, background: tc.bg, color: tc.text, border: `1px solid ${tc.border}`, letterSpacing: '0.06em' }}>{tc.label}</span>
+                                <span style={{ fontSize: 10, color: '#6b7280', fontFamily: "'DM Mono',monospace" }}>{fmtTime(msg.created_at)}</span>
+                              </div>
+
+                              {/* Patient bubble — right-aligned */}
+                              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
+                                <div style={{ maxWidth: '84%' }}>
+                                  <div style={{ fontSize: 9, fontWeight: 700, color: isEmergency ? '#dc2626' : '#0d9488', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right', marginBottom: 4 }}>{patient.name}</div>
+                                  <div style={{ background: isEmergency ? '#dc2626' : '#0d9488', color: '#fff', borderRadius: '16px 16px 4px 16px', padding: '11px 15px', fontSize: 13, lineHeight: 1.6, boxShadow: isEmergency ? '0 2px 8px rgba(220,38,38,0.22)' : '0 2px 8px rgba(13,148,136,0.18)', wordBreak: 'break-word' }}>
+                                    {msg.user_message}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Bot reply — left-aligned */}
+                              <div style={{ display: 'flex', gap: 9, alignItems: 'flex-start' }}>
+                                <div style={{ width: 28, height: 28, borderRadius: 8, background: isEmergency ? '#dc2626' : 'linear-gradient(135deg,#0d9488,#0f766e)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2, boxShadow: '0 1px 4px rgba(0,0,0,0.14)' }}>
+                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5"/></svg>
+                                </div>
+                                <div style={{ flex: 1 }}>
+                                  <div style={{ fontSize: 9, fontWeight: 700, color: isEmergency ? '#dc2626' : '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Care Assistant</div>
+                                  <div style={{ background: isEmergency ? '#fff5f5' : '#fff', color: isEmergency ? '#7f1d1d' : '#334155', borderRadius: 10, padding: '11px 15px', fontSize: 13, lineHeight: 1.65, border: `1px solid ${isEmergency ? '#fecaca' : '#e2e8f0'}`, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', wordBreak: 'break-word' }}>
+                                    {msg.bot_reply}
+                                  </div>
+                                </div>
+                              </div>
+
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Footer note */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: '#fff', borderTop: '1px solid #e2e8f0' }}>
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    <span style={{ fontSize: 10, color: '#94a3b8' }}>Read-only view of the patient's conversations with the NeuroSight care assistant.</span>
+                  </div>
+
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Timeline */}
         {monitoringSubTab === 'timeline' && (
