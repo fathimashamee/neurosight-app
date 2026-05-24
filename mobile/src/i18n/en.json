@@ -47,6 +47,35 @@
     "notifDenied": "Blocked — enable in browser settings",
     "goHome": "Go to Home →"
   },
+  "chat": {
+    "title": "Care Assistant",
+    "subtitle": "NeuroSight AI",
+    "tagline": "always here for you",
+    "clear": "Clear",
+    "quickTitle": "Quick questions",
+    "quick1": "What is my diagnosis?",
+    "quick2": "What are my treatment side effects?",
+    "quick3": "When should I go to hospital?",
+    "quick4": "What should I eat?",
+    "loading": "Loading your conversations…",
+    "welcome": "Hello {{name}}! I am your NeuroSight care assistant. You can ask me about your condition, treatment side effects, what to eat, or when to visit the hospital.",
+    "clearWelcome": "Hello {{name}}! Ask me anything about your health.",
+    "placeholder": "Type your question here…",
+    "disclaimer": "Answers are based on your medical record. Always confirm with your doctor.",
+    "errorSend": "Could not send. Please check your connection and try again.",
+    "botLabel": "Care Assistant",
+    "urgentLabel": "⚠ Urgent Advice",
+    "callBtn": "📞 Call 1990 Now",
+    "urgentNotice": "An urgent message was received. See below.",
+    "topics": {
+      "emergency": "Urgent advice",
+      "diagnosis": "About your diagnosis",
+      "treatment": "About your treatment",
+      "nutrition": "Eating & nutrition",
+      "symptom": "Symptom advice",
+      "general": "General info"
+    }
+  },
   "home": {
     "morning": "Good Morning",
     "afternoon": "Good Afternoon",
