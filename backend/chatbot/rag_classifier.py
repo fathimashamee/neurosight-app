@@ -4,6 +4,7 @@ Multilingual DistilBERT + FAISS for intent classification
 and answer retrieval in English, Sinhala, Tamil
 """
 
+import re
 from pathlib import Path
 import numpy as np
 import pandas as pd
@@ -255,29 +256,157 @@ class RAGClassifier:
         # Find answer using the classified intent
         base_answer = self._find_answer(message, language, intent=intent)
 
+        diagnosis = context.get("diagnosis", "")
+        plan_summary = context.get("plan_summary", "")
+        checkin_info = context.get("checkin_info", "")
+
+        # Replace the QA dataset's generic "brain tumor/tumour" placeholder with
+        # the patient's actual diagnosis so every response is specific.
+        if diagnosis and "no tumour" not in diagnosis.lower():
+            base_answer = re.sub(
+                r'brain\s+tum(?:o|ou)r',
+                diagnosis,
+                base_answer,
+                flags=re.IGNORECASE,
+            )
+
+        # QA dataset only has tumour-positive "diagnosis" answers.
+        # Override with a reassuring No Tumour response when appropriate.
+        if intent == "diagnosis" and "no tumour" in diagnosis.lower():
+            no_tumour_answers = {
+                "en": "Your MRI scan shows no brain tumour, which is very reassuring. Any symptoms you are experiencing may have other causes that your doctor will evaluate and address.",
+                "ta": "உங்கள் MRI ஸ்கேன் மூளை கட்டி இல்லை என்று காட்டுகிறது, இது மிகவும் ஆறுதலான செய்தி. நீங்கள் அனுபவிக்கும் அறிகுறிகளுக்கு வேறு காரணங்கள் இருக்கலாம்; உங்கள் மருத்துவர் அவற்றை மதிப்பீடு செய்வார்.",
+                "si": "ඔබේ MRI ස්කෑන් මොළේ ගෙඩියක් නොමැති බව දක්වයි. මෙය ඉතා ශුභදායක ප්‍රවෘත්තිය. ඔබ අත්විඳින රෝග ලක්ෂණවලට වෙනත් හේතු ද ඇති විය හැකිය; ඔබේ වෛද්‍යවරයා ඒවා ඇගයීමට ලක් කරනු ඇත.",
+            }
+            base_answer = no_tumour_answers.get(language, no_tumour_answers["en"])
+
+        # QA dataset answers for "treatment" are generic. When the patient has
+        # a recorded plan, prepend it so the reply is actually personalised.
+        elif intent == "treatment" and plan_summary and plan_summary != "No treatment plan is recorded yet.":
+            base_answer = f"Your current treatment plan is: {plan_summary}. {base_answer}"
+
+        # For symptom intent, surface the latest check-in data if available.
+        if intent == "symptom" and checkin_info:
+            base_answer += f" Your latest check-in recorded: {checkin_info}."
+
         # Add patient context
         reply = self._add_context(base_answer, intent, context, language)
 
         return reply, intent, False
 
     def _add_context(self, answer: str, intent: str, context: dict, language: str) -> str:
-        doctor = context.get("doctor", "")
-        diagnosis = context.get("diagnosis", "")
-        patient_name = context.get("patient_name", "")
+        doctor      = context.get("doctor", "")
+        diagnosis   = context.get("diagnosis", "")
+        plan        = context.get("plan_summary", "")
+        latest_scan = context.get("latest_scan", "")
+
+        is_no_tumour = "no tumour" in diagnosis.lower() if diagnosis else False
+        has_plan     = bool(plan and plan != "No treatment plan is recorded yet.")
+        dr = doctor if doctor and re.match(r'^[Dd]r\.?\s+', doctor.strip()) else (f"Dr. {doctor}" if doctor else "your doctor")
 
         if language == "en":
-            if doctor and intent in ["diagnosis", "treatment", "symptom"]:
-                answer += f" Please consult {doctor} for personalized advice."
-            if diagnosis and intent == "diagnosis":
-                answer += f" Your confirmed diagnosis is {diagnosis}."
+            if intent == "diagnosis":
+                if latest_scan:
+                    answer += f" Your latest scan result: {latest_scan}."
+                if has_plan:
+                    answer += f" Your current treatment plan: {plan}."
+                if diagnosis:
+                    if is_no_tumour:
+                        answer += " Your scan results confirm No Tumour — this is good news."
+                    else:
+                        answer += f" Your confirmed diagnosis is {diagnosis}."
+                answer += f" Please ask {dr} to explain what this means for your specific situation."
+
+            elif intent == "treatment":
+                # plan_summary is already prepended in answer(); add the doctor sign-off
+                answer += f" Always consult {dr} before making any changes to your medications or treatment."
+
+            elif intent == "symptom":
+                if diagnosis:
+                    answer += f" These symptoms may be related to {diagnosis} or its treatment."
+                answer += f" Report any new or worsening symptoms to {dr} as soon as possible."
+
+            elif intent == "general":
+                if diagnosis:
+                    answer += f" Your current diagnosis is {diagnosis}."
+                if has_plan:
+                    answer += f" Your treatment plan: {plan}."
+                answer += f" For specific questions, contact your care team or {dr} directly."
+
+            elif intent == "nutrition":
+                answer += f" Please consult {dr} or a dietitian for a nutrition plan tailored to your specific treatment."
 
         elif language == "si":
-            if doctor and intent in ["diagnosis", "treatment", "symptom"]:
-                answer += f" පුද්ගලික උපදෙස් සඳහා කරුණාකර වෛද්‍ය {doctor} හමුවන්න."
+            if intent == "diagnosis":
+                if latest_scan:
+                    answer += f" ඔබේ නවතම ස්කෑන් ප්‍රතිඵලය: {latest_scan}."
+                if has_plan:
+                    answer += f" ඔබේ ප්‍රතිකාර සැලැස්ම: {plan}."
+                if diagnosis:
+                    if is_no_tumour:
+                        answer += " ඔබේ ස්කෑන් ප්‍රතිඵල ගෙඩියක් නොමැති බව පෙන්වයි — මෙය සුභ ප්‍රවෘත්තිය."
+                    else:
+                        answer += f" ඔබේ රෝග විනිශ්චය: {diagnosis}."
+                if doctor:
+                    answer += f" පුද්ගලික උපදෙස් සඳහා කරුණාකර වෛද්‍ය {doctor} හමුවන්න."
+
+            elif intent == "treatment":
+                if doctor:
+                    answer += f" ඔබේ ඖෂධ හෝ ප්‍රතිකාර වෙනස් කිරීමට පෙර සෑම විටම වෛද්‍ය {doctor} හමුවන්න."
+
+            elif intent == "symptom":
+                if diagnosis:
+                    answer += f" මෙම රෝග ලක්ෂණ {diagnosis} හෝ එහි ප්‍රතිකාරය සමඟ සම්බන්ධ විය හැකිය."
+                if doctor:
+                    answer += f" නව හෝ වැඩිවන රෝග ලක්ෂණ ගැන වෛද්‍ය {doctor} ට දන්වන්න."
+
+            elif intent == "general":
+                if diagnosis:
+                    answer += f" ඔබේ වත්මන් රෝග විනිශ්චය: {diagnosis}."
+                if has_plan:
+                    answer += f" ඔබේ ප්‍රතිකාර සැලැස්ම: {plan}."
+                if doctor:
+                    answer += f" ඔබේ වෛද්‍යවරයා: {doctor}."
+
+            elif intent == "nutrition":
+                if doctor:
+                    answer += f" ඔබේ ප්‍රතිකාරයට ගැළපෙන පෝෂණ සැලැස්මක් සඳහා වෛද්‍ය {doctor} හෝ ආහාරවේදියෙකු හමුවන්න."
 
         elif language == "ta":
-            if doctor and intent in ["diagnosis", "treatment", "symptom"]:
-                answer += f" தனிப்பட்ட ஆலோசனைக்கு டாக்டர் {doctor} ஐ அணுகவும்."
+            if intent == "diagnosis":
+                if latest_scan:
+                    answer += f" உங்கள் சமீபத்திய ஸ்கேன் முடிவு: {latest_scan}."
+                if has_plan:
+                    answer += f" உங்கள் தற்போதைய சிகிச்சை திட்டம்: {plan}."
+                if diagnosis:
+                    if is_no_tumour:
+                        answer += " உங்கள் ஸ்கேன் முடிவுகள் கட்டி இல்லை என்று உறுதிப்படுத்துகின்றன — இது நல்ல செய்தி."
+                    else:
+                        answer += f" உங்கள் நோயறிதல்: {diagnosis}."
+                if doctor:
+                    answer += f" தனிப்பட்ட ஆலோசனைக்கு டாக்டர் {doctor} ஐ அணுகவும்."
+
+            elif intent == "treatment":
+                if doctor:
+                    answer += f" உங்கள் மருந்துகள் அல்லது சிகிச்சையில் மாற்றம் செய்வதற்கு முன் டாக்டர் {doctor} ஐ அணுகவும்."
+
+            elif intent == "symptom":
+                if diagnosis:
+                    answer += f" இந்த அறிகுறிகள் {diagnosis} அல்லது அதன் சிகிச்சையுடன் தொடர்புடையதாக இருக்கலாம்."
+                if doctor:
+                    answer += f" புதிய அல்லது மோசமாகும் அறிகுறிகளை டாக்டர் {doctor} க்கு தெரிவிக்கவும்."
+
+            elif intent == "general":
+                if diagnosis:
+                    answer += f" உங்கள் தற்போதைய நோயறிதல்: {diagnosis}."
+                if has_plan:
+                    answer += f" உங்கள் சிகிச்சை திட்டம்: {plan}."
+                if doctor:
+                    answer += f" உங்கள் மருத்துவர்: {doctor}. குறிப்பிட்ட கேள்விகளுக்கு நேரடியாக தொடர்பு கொள்ளவும்."
+
+            elif intent == "nutrition":
+                if doctor:
+                    answer += f" உங்கள் சிகிச்சைக்கு ஏற்ற உணவு திட்டத்திற்கு டாக்டர் {doctor} அல்லது உணவியல் நிபுணரை அணுகவும்."
 
         return answer
 
