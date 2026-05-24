@@ -30,6 +30,12 @@ def _has_emergency_language(text: str) -> bool:
     return any(term in lowered for term in EMERGENCY_TERMS)
 
 
+def _dr(name: str | None, fallback: str = "your doctor") -> str:
+    if not name:
+        return fallback
+    return name if re.match(r'^[Dd]r\.?\s+', name.strip()) else f"Dr. {name}"
+
+
 def _safe_join(values, sep=" "):
     parts = [str(v).strip() for v in values if v and str(v).strip()]
     return sep.join(parts)
@@ -127,7 +133,7 @@ class ChatbotClassifier:
             "these vary by treatment type."
         )
         parts.append(
-            f"Always consult {'Dr. ' + doctor if doctor else 'your doctor'} "
+            f"Always consult {_dr(doctor)} "
             "before making any changes to your medications or treatment."
         )
         return " ".join(parts)
@@ -152,7 +158,7 @@ class ChatbotClassifier:
             parts.append(f"Your latest check-in recorded: {checkin}.")
         parts.append(
             "If this symptom is new, worsening, or worrying you, please report it to "
-            f"{'Dr. ' + doctor if doctor else 'your care team'} as soon as possible."
+            f"{_dr(doctor, 'your care team')} as soon as possible."
         )
         parts.append(
             "Call 1990 or go to emergency immediately if symptoms become severe or sudden."
@@ -170,7 +176,7 @@ class ChatbotClassifier:
         if plan and plan != "No treatment plan is recorded yet.":
             parts.append(f"Your treatment plan: {plan}.")
         if doctor:
-            parts.append(f"Your assigned doctor is Dr. {doctor}.")
+            parts.append(f"Your assigned doctor is {_dr(doctor)}.")
         parts.append(
             "For specific questions about your care, please contact your care team directly "
             "or check with your doctor at your next appointment."

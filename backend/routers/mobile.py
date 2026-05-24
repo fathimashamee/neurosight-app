@@ -151,7 +151,8 @@ def _patient_context(db: Session, patient: Patient) -> dict:
     if latest_result and latest_result.pathology_grade:
         diagnosis_parts.append(f"Grade {latest_result.pathology_grade}")
     elif latest_result and latest_result.predicted_label:
-        diagnosis_parts.append(latest_result.predicted_label)
+        if latest_result.predicted_label != patient.tumour_type:
+            diagnosis_parts.append(latest_result.predicted_label)
 
     plan_summary = "; ".join(
         _compact_text(
@@ -240,6 +241,7 @@ def _answer_chat(message: str, context: dict, language: str = "en") -> tuple[str
                     "diagnosis": context.get("diagnosis", ""),
                     "doctor": context.get("doctor", ""),
                     "plan_summary": context.get("plan_summary", ""),
+                    "latest_scan": context.get("latest_scan", ""),
                     "checkin_info": context.get("checkin_info", ""),
                 }
             },
@@ -576,6 +578,49 @@ def chat_history(
         )
         for row in rows
     ]
+
+
+@router.get("/report")
+def patient_report(
+    auth: tuple[Patient, str] = Depends(get_mobile_patient),
+    db: Session = Depends(get_db),
+):
+    patient, _role = auth
+    latest_result = _latest_result(db, patient.id)
+    plans = _latest_treatment_plans(db, patient.id)
+
+    scan = None
+    if latest_result:
+        label = latest_result.confirmed_label or latest_result.predicted_label
+        scan = {
+            "ai_prediction":    latest_result.predicted_label,
+            "confirmed_label":  latest_result.confirmed_label,
+            "final_label":      label,
+            "pathology_grade":  latest_result.pathology_grade,
+            "confidence":       round((latest_result.confidence or 0) * 100, 1),
+            "scanned_at":       latest_result.created_at.isoformat() if latest_result.created_at else None,
+            "doctor_confirmed": latest_result.confirmed_label is not None,
+        }
+
+    return {
+        "patient": _patient_payload(patient),
+        "scan": scan,
+        "treatment_plans": [
+            {
+                "id":               p.id,
+                "title":            p.title,
+                "plan_type":        p.plan_type,
+                "medications":      p.medications,
+                "therapy_schedule": p.therapy_schedule,
+                "surgery_details":  p.surgery_details,
+                "notes":            p.notes,
+                "status":           p.status,
+                "plan_date":        p.plan_date,
+                "created_by_name":  p.created_by_name,
+            }
+            for p in plans
+        ],
+    }
 
 
 @router.post("/chat", response_model=ChatResponse)

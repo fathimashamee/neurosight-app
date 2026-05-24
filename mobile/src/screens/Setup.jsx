@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import i18n from '../i18n'
 
 function fmt24to12(t) {
   const [h, m] = t.split(':').map(Number)
@@ -17,9 +18,20 @@ export default function Setup() {
   const isCaretaker = role === 'caretaker'
   const displayName = isCaretaker ? (caretaker.name || patient.name) : patient.name
 
-  const [reminderTime, setReminderTime] = useState('20:00')
+  // True when patient already completed first-time setup and returns to change settings
+  const isSettings  = !!localStorage.getItem(`setup_done_${patient.hospital_id}`)
+
+  const [reminderTime, setReminderTime] = useState(
+    localStorage.getItem('reminder_time') || '20:00'
+  )
   const [showPicker,   setShowPicker]   = useState(false)
-  const [notifStatus,  setNotifStatus]  = useState(null)
+  const [notifStatus,  setNotifStatus]  = useState(
+    typeof Notification !== 'undefined' && Notification.permission === 'granted'
+      ? 'granted'
+      : typeof Notification !== 'undefined' && Notification.permission === 'denied'
+        ? 'denied'
+        : null
+  )
 
   async function requestNotifications() {
     if (!('Notification' in window)) { setNotifStatus('denied'); return }
@@ -59,32 +71,40 @@ export default function Setup() {
       }}>
         <div style={{ position:'absolute', top:-40, right:-40, width:160, height:160, borderRadius:'50%', background:'rgba(255,255,255,0.06)', pointerEvents:'none' }} />
 
-        {/* Top-left logo badge */}
-        <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:24, animation:'fadeUp 0.3s ease both' }}>
-          <div style={{
-            width:32, height:32, borderRadius:9,
-            background:'rgba(255,255,255,0.15)',
-            border:'1px solid rgba(255,255,255,0.25)',
-            display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
-          }}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-              <polyline points="22 4 12 14.01 9 11.01"/>
-            </svg>
+        {/* Top row: back button (settings mode) or logo badge (first-time) */}
+        {isSettings ? (
+          <button
+            onClick={() => navigate('/home')}
+            style={{ background:'rgba(255,255,255,0.15)', border:'1px solid rgba(255,255,255,0.25)', borderRadius:10, color:'#fff', padding:'6px 12px', fontSize:12, cursor:'pointer', marginBottom:20, display:'inline-flex', alignItems:'center', gap:4, animation:'fadeUp 0.3s ease both' }}>
+            ← {t('setup.back')}
+          </button>
+        ) : (
+          <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:24, animation:'fadeUp 0.3s ease both' }}>
+            <div style={{
+              width:32, height:32, borderRadius:9,
+              background:'rgba(255,255,255,0.15)',
+              border:'1px solid rgba(255,255,255,0.25)',
+              display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
+            }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                <polyline points="22 4 12 14.01 9 11.01"/>
+              </svg>
+            </div>
+            <div>
+              <div style={{ fontSize:9, fontWeight:700, letterSpacing:'0.16em', color:'rgba(255,255,255,0.5)', textTransform:'uppercase', lineHeight:1 }}>Account Ready</div>
+              <div style={{ fontSize:11, color:'rgba(255,255,255,0.75)', fontWeight:500, marginTop:3 }}>NeuroSight Care</div>
+            </div>
           </div>
-          <div>
-            <div style={{ fontSize:9, fontWeight:700, letterSpacing:'0.16em', color:'rgba(255,255,255,0.5)', textTransform:'uppercase', lineHeight:1 }}>Account Ready</div>
-            <div style={{ fontSize:11, color:'rgba(255,255,255,0.75)', fontWeight:500, marginTop:3 }}>NeuroSight Care</div>
-          </div>
-        </div>
+        )}
 
-        {/* Centered welcome content */}
+        {/* Centered header content */}
         <div style={{ textAlign:'center', animation:'fadeUp 0.35s ease 0.06s both' }}>
           <p style={{ fontSize:13, color:'rgba(255,255,255,0.65)', margin:'0 0 4px', fontWeight:500 }}>
-            {t('setup.welcome')},
+            {isSettings ? t('setup.settingsFor') : t('setup.welcome')},
           </p>
           <h1 style={{ fontSize:26, fontWeight:700, color:'#fff', margin:'0 0 16px', letterSpacing:'-0.3px', lineHeight:1.2 }}>
-            {displayName || '—'}
+            {isSettings ? t('setup.settingsTitle') : (displayName || '—')}
           </h1>
 
           {patient.assigned_doctor && (
@@ -181,7 +201,7 @@ export default function Setup() {
             <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
           </svg>
           <p style={{ fontSize:11, color:'#94a3b8', margin:0, lineHeight:1.6 }}>
-            You can update these preferences anytime in Settings.
+            {isSettings ? t('setup.hintSettings') : t('setup.hint')}
           </p>
         </div>
 
@@ -200,7 +220,7 @@ export default function Setup() {
             boxShadow:'0 4px 18px rgba(13,148,136,0.32)',
             letterSpacing:'0.01em', transition:'opacity 0.15s, transform 0.15s',
           }}>
-          {t('setup.goHome')}
+          {isSettings ? t('setup.saveSettings') : t('setup.goHome')}
         </button>
 
       </div>
