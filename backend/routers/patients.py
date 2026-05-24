@@ -13,6 +13,7 @@ from backend.core.security import get_current_active_user
 from backend.db.database import get_db
 from backend.models.patient import Patient
 from backend.models.caretaker import Caretaker
+from backend.models.chat_message import ChatMessage
 from backend.models.user import User
 
 from backend.schemas.patient import PatientCreate, PatientRead, PatientResponse, PatientUpdate, OCRResponse, CaretakerRead
@@ -262,3 +263,44 @@ def update_caretaker(
     db.commit()
     db.refresh(caretaker)
     return caretaker
+
+# ── Patient chat history (clinician view) ────────────────────────────────────
+
+class ChatMessageOut(_BaseModel):
+    id: int
+    user_message: str
+    bot_reply: str
+    topic: _Optional[str]
+    emergency: bool
+    created_at: str
+
+    class Config:
+        from_attributes = True
+
+
+@router.get("/{patient_id}/chat", response_model=list[ChatMessageOut])
+def get_patient_chat_history(
+    patient_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    patient = db.get(Patient, patient_id)
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+    rows = (
+        db.query(ChatMessage)
+        .filter(ChatMessage.patient_id == patient_id)
+        .order_by(ChatMessage.created_at.asc())
+        .all()
+    )
+    return [
+        ChatMessageOut(
+            id=r.id,
+            user_message=r.user_message,
+            bot_reply=r.bot_reply,
+            topic=r.topic,
+            emergency=bool(r.emergency),
+            created_at=r.created_at.isoformat() if r.created_at else "",
+        )
+        for r in rows
+    ]

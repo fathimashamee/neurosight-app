@@ -70,4 +70,44 @@ If you use a separate test database URL:
 2. Open API docs at http://127.0.0.1:8000/docs.
 3. Use auth endpoint (register/signup) to create a new user.
 
+ # Mobile Chatbot Instructions
+8) Mobile Chatbot Initial Setup (run once before using the chatbot)
+Note: The backend venv must be activated before running any of these steps.
+      All commands run from the project root unless stated otherwise.
+
+Step 1 - Install chatbot dependencies (inside activated backend venv):
+	pip install -r backend/chatbot/requirements.txt
+
+Step 2 - Download model.safetensors from Google Drive (NOT in git — too large):
+	Download link:
+		https://drive.google.com/file/d/1BGm0flcAK47gmsEV8-fEeVsZfPq9qUOk/view?usp=drive_link
+	Place the downloaded file at:
+		backend/chatbot/model/neurosight_distilbert/model.safetensors
+	The following files ARE already in the repository (no download needed):
+		backend/chatbot/model/faiss_index.bin
+		backend/chatbot/model/qa_dataset_final.csv
+
+	IMPORTANT: Without model.safetensors the chatbot microservice will not start.
+	           The main backend (port 8000) will still work using the TF-IDF fallback.
+
+Step 3 - Run the chatbot microservice in a separate terminal (port 8001):
+	uvicorn backend.chatbot.microservice:app --port 8001
+
+Step 4 - Run the main backend as usual in another terminal (port 8000):
+	npm run dev
+	   OR
+	uvicorn backend.main:app --reload --port 8000
+
+Both terminals must stay open for the chatbot to work.
+If port 8001 is not running, the chatbot automatically falls back to
+the TF-IDF classifier (Step 2) — no crash, but reduced answer quality.
+
+9) Mobile App Setup and Run
+1. Go to mobile folder:
+	cd mobile
+2. Install dependencies:
+	npm install
+3. Start mobile app:
+	npm run dev
+4. Open URL shown by Vite (usually http://localhost:5174).
 
