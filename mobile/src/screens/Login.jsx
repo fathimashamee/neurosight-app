@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { API_BASE } from '../api'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -41,10 +42,17 @@ export default function Login() {
         : { hospital_id: patientId.trim().toUpperCase(), phone: phone.trim() }
 
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}${endpoint}`,
+        `${API_BASE}${endpoint}`,
         { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
       )
-      if (!res.ok) throw new Error()
+      if (!res.ok) {
+        let message = tk.error
+        try {
+          const data = await res.json()
+          message = data.detail || message
+        } catch {}
+        throw new Error(message)
+      }
       const data = await res.json()
       localStorage.setItem('mobile_token', data.token)
       localStorage.setItem('mobile_patient', JSON.stringify(data.patient))
@@ -132,7 +140,7 @@ export default function Login() {
         {/* Patient ID field */}
         <div style={{ marginBottom:16 }}>
           <label style={{ display:'block', fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.12em', color:'#6b7280', marginBottom:7 }}>
-            {tk.idLabel}
+            {tk.idLabel || 'Hospital ID / Patient ID'}
           </label>
           <div style={{
             display:'flex', alignItems:'center',
@@ -155,10 +163,10 @@ export default function Login() {
               onKeyDown={e => e.key === 'Enter' && handleLogin()}
               placeholder={tk.idPlaceholder}
               autoCapitalize="characters"
-              style={{ flex:1, border:'none', padding:'13px 10px', fontSize:14, fontWeight:600, color:'#111827', background:'transparent', fontFamily:"'DM Mono',monospace", letterSpacing:'0.05em' }}
+              style={{ flex:1, border:'none', padding:'13px 10px', fontSize:14, fontWeight:600, color:'#111827', background:'transparent', fontFamily:"'DM Sans',sans-serif", letterSpacing:'0.05em' }}
             />
           </div>
-          <p style={{ fontSize:11, color:'#9ca3af', marginTop:5, marginBottom:0 }}>{tk.idHint}</p>
+          <p style={{ fontSize:11, color:'#9ca3af', marginTop:5, marginBottom:0 }}>{tk.idHint || 'Enter the hospital ID from the patient record (or numeric patient ID if provided).'}</p>
         </div>
 
         {/* Phone field — caretaker only */}
