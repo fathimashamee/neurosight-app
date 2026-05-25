@@ -132,10 +132,6 @@ export default function Home() {
 
         {/* Info pills */}
         <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', animation: 'fadeUp 0.4s ease 0.08s both' }}>
-          <div style={{ background: 'rgba(255,255,255,0.15)', borderRadius: 20, padding: '4px 11px', fontSize: 11, color: '#fff', display: 'flex', alignItems: 'center', gap: 4 }}>
-            <span style={{ opacity: 0.7 }}>{t('home.hospitalId')}:</span>
-            <span style={{ fontWeight: 700, fontFamily: "'DM Mono',monospace" }}>{patient.hospital_id || '—'}</span>
-          </div>
           <div style={{ background: tc.bg, borderRadius: 20, padding: '4px 11px', fontSize: 11, color: tc.text, fontWeight: 700 }}>
             {patient.tumour_type || t('home.notClassified')}
           </div>

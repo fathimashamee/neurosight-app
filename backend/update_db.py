@@ -180,6 +180,8 @@ def update_db():
                         nausea                VARCHAR(50) NOT NULL,
                         medication            VARCHAR(50) NOT NULL,
                         overall               VARCHAR(50) NOT NULL,
+                        sleep                 VARCHAR(50),
+                        appetite              VARCHAR(50),
                         note                  TEXT,
                         score                 INTEGER NOT NULL,
                         level                 VARCHAR(20) NOT NULL,
@@ -195,6 +197,10 @@ def update_db():
                     raise
         else:
             print("  checkins table already exists")
+            _add_columns(conn, "checkins", [
+                ("sleep", "VARCHAR(50)"),
+                ("appetite", "VARCHAR(50)"),
+            ])
 
         # ── chat_messages table ────────────────────────────────────────────────
         print("Checking chat_messages table…")

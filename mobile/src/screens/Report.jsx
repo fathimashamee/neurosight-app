@@ -42,7 +42,7 @@ export default function Report() {
           {t('report.title')}
         </div>
         <div style={{ fontSize: 22, fontWeight: 800, color: '#fff' }}>{patient.name || '—'}</div>
-        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', marginTop: 4, fontFamily: "'DM Mono', monospace" }}>{patient.hospital_id || '—'}</div>
+        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', marginTop: 4, fontFamily: "'DM Sans', sans-serif" }}>{patient.hospital_id || '—'}</div>
       </div>
 
       {/* Body */}
