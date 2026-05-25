@@ -12,9 +12,9 @@ This guide explains how to set up both the **backend (FastAPI + PostgreSQL)** an
 * [Prerequisites](#prerequisites)
 * [Setup Instructions](#setup-instructions)
 
-  * [Database Setup](#database-setup)
-  * [Backend Setup](#backend-setup)
-  * [Frontend Setup](#frontend-setup)
+* [Database Setup](#database-setup)
+* [Backend Setup](#backend-setup)
+* [Frontend Setup](#frontend-setup)
 * [Testing the Database Connection](#testing-the-database-connection)
 * [Running the Project](#running-the-project)
 * [Creating a New User](#creating-a-new-user)

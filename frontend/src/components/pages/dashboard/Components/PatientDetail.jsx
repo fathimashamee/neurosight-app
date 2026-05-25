@@ -166,9 +166,11 @@ const PatientDetail = () => {
   const [chainInfoId, setChainInfoId] = useState(null);
   const [expandedCheckin, setExpandedCheckin] = useState(null);
   const [monitoringSubTab, setMonitoringSubTab] = useState('checkin');
+  const [monitoringCheckins, setMonitoringCheckins] = useState([]);
   const [planSaving, setPlanSaving] = useState(false);
   const [chatHistory, setChatHistory] = useState([]);
   const [chatLoading, setChatLoading] = useState(false);
+  const [monitoringAlerts, setMonitoringAlerts] = useState([]);
   const [caretakers, setCaretakers] = useState([]);
   const [caretakerEdits, setCaretakerEdits] = useState({});
   const [caretakerUpdateSaving, setCaretakerUpdateSaving] = useState(null);
@@ -196,6 +198,23 @@ const PatientDetail = () => {
         api(`/treatment-plans/patient/${id}`).catch(() => []),
         api(`/patients/${id}/caretakers`).catch(() => []),
       ]);
+      // fetch patient-specific checkins for monitoring tab
+      try {
+        const ck = await api(`/patients/${id}/checkins`).catch(() => []);
+        setMonitoringCheckins(Array.isArray(ck) ? ck : []);
+      } catch (e) {
+        setMonitoringCheckins([]);
+      }
+      // fetch patient-specific emergency alerts and filter to this patient
+      try {
+        const rawAlerts = await api(`/dashboard/patient-alerts?limit=100`).catch(() => []);
+        const filteredAlerts = Array.isArray(rawAlerts)
+          ? rawAlerts.filter(alert => String(alert.patient_id) === String(id))
+          : [];
+        setMonitoringAlerts(filteredAlerts);
+      } catch (e) {
+        setMonitoringAlerts([]);
+      }
       setEditData(prev => ({ ...prev, documents: docs }));
       setPatientAdmissions(admissions);
       setTreatmentPlans(Array.isArray(plans) ? plans : []);
@@ -748,22 +767,51 @@ const PatientDetail = () => {
   };
 
   const renderMonitoringTab = () => {
-    const DEMO_CHECKINS = [
-      { date: '17 May 2026', time: '08:02 PM', score: 12, level: 'RED',      headache: 'Severe', seizure: 'No', energy: 'Cannot get up', nausea: 'Vomited once', medication: 'Yes — all doses', overall: 'Much worse',       note: 'Headache getting worse since morning' },
-      { date: '16 May 2026', time: '08:11 PM', score: 5,  level: 'AMBER',    headache: 'Moderate', seizure: 'No', energy: 'Very tired', nausea: 'Feeling sick', medication: 'Yes — all doses', overall: 'Worse than yesterday', note: '' },
-      { date: '15 May 2026', time: '08:00 PM', score: 1,  level: 'GREEN',    headache: 'No headache', seizure: 'No', energy: 'Normal', nausea: 'None', medication: 'Yes — all doses', overall: 'Good',                          note: '' },
-      { date: '14 May 2026', time: '08:05 PM', score: 2,  level: 'GREEN',    headache: 'Mild', seizure: 'No', energy: 'Normal', nausea: 'None', medication: 'Yes — all doses', overall: 'Good',                                  note: '' },
-      { date: '13 May 2026', time: '08:18 PM', score: 18, level: 'CRITICAL', headache: 'Severe', seizure: 'Yes — brief', energy: 'Cannot get up', nausea: 'Vomited many times', medication: 'Missed all doses', overall: 'Much worse', note: 'Had a seizure around 7pm, lasted ~1 min' },
-      { date: '12 May 2026', time: '08:00 PM', score: 3,  level: 'GREEN',    headache: 'Mild', seizure: 'No', energy: 'A bit tired', nausea: 'None', medication: 'Yes — all doses', overall: 'Same as usual',                    note: '' },
-      { date: '11 May 2026', time: '08:03 PM', score: 6,  level: 'AMBER',    headache: 'Moderate', seizure: 'No', energy: 'Very tired', nausea: 'Feeling sick', medication: 'Missed one dose', overall: 'Worse than yesterday',  note: 'Forgot evening dose' },
-    ];
-    const DEMO_ALERTS = [
-      { type: 'EMERGENCY', time: '13 May 2026 · 7:52 PM', symptom: 'Seizure reported', detail: 'Seizure — brief · Severity 10/10 · Just now', color: '#dc2626', bg: '#fef2f2', border: '#fecaca' },
-      { type: 'RED ALERT', time: '17 May 2026 · 8:02 PM', symptom: 'High symptom score (12)', detail: 'Severe headache + vomiting + extreme fatigue', color: '#c2410c', bg: '#fff7ed', border: '#fed7aa' },
-      { type: 'SYMPTOM',   time: '16 May 2026 · 2:14 PM', symptom: 'Severe headache reported', detail: 'Headache · Severity 8/10 · Started 1–2 hours ago', color: '#b45309', bg: '#fffbeb', border: '#fde68a' },
-      { type: 'AMBER',     time: '16 May 2026 · 8:11 PM', symptom: 'Amber check-in score (5)', detail: 'Moderate headache + fatigue + nausea', color: '#92400e', bg: '#fffbeb', border: '#fde68a' },
-      { type: 'AMBER',     time: '11 May 2026 · 8:03 PM', symptom: 'Amber check-in score (6)', detail: 'Moderate headache + missed medication dose', color: '#92400e', bg: '#fffbeb', border: '#fde68a' },
-    ];
+    const checkins = (monitoringCheckins || []).map(c => {
+      // transform backend shape to what the UI expects
+      const dt = c.created_at ? new Date(c.created_at) : null;
+      const date = dt ? dt.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+      const time = dt ? dt.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : '';
+      return {
+        id: c.id,
+        date,
+        time,
+        score: c.score,
+        level: c.level || (c.emergency ? 'CRITICAL' : 'GREEN'),
+        headache: c.headache,
+        seizure: c.seizure,
+        energy: c.energy,
+        nausea: c.nausea,
+        medication: c.medication,
+        overall: c.overall,
+        note: c.note || '',
+      };
+    });
+    const stats = checkins.reduce((acc, c) => {
+      acc.total += 1;
+      const level = (c.level || '').toUpperCase();
+      if (level === 'GREEN') acc.green += 1;
+      else if (level === 'AMBER') acc.amber += 1;
+      else if (level === 'RED' || level === 'CRITICAL') acc.red += 1;
+      else if (typeof c.score === 'number') {
+        if (c.score >= 12) acc.red += 1;
+        else if (c.score >= 6) acc.amber += 1;
+        else acc.green += 1;
+      }
+      return acc;
+    }, { total: 0, green: 0, amber: 0, red: 0 });
+    const latestCheckin = checkins[0] || null;
+    const daysWithCheckins = new Set(checkins.map(c => c.date)).size;
+    const lastActive = latestCheckin ? `${latestCheckin.date}${latestCheckin.time ? ` · ${latestCheckin.time}` : ''}` : 'No recent activity';
+    const alerts = (monitoringAlerts || []).map(alert => ({
+      type: alert.emergency ? 'EMERGENCY' : 'ALERT',
+      time: alert.created_at ? new Date(alert.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—',
+      symptom: alert.message || 'Emergency submission',
+      detail: alert.reply || 'Sent from mobile app',
+      color: '#dc2626',
+      bg: '#fef2f2',
+      border: '#fecaca',
+    }));
     const levelMeta = l => ({ CRITICAL: { bg: '#4c0519', text: '#fff', label: 'CRITICAL' }, RED: { bg: '#dc2626', text: '#fff', label: 'RED' }, AMBER: { bg: '#f59e0b', text: '#fff', label: 'AMBER' }, GREEN: { bg: '#16a34a', text: '#fff', label: 'GREEN' } }[l] || { bg: '#94a3b8', text: '#fff', label: l });
 
     const MON_TABS = [
@@ -784,9 +832,9 @@ const PatientDetail = () => {
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1d4ed8" strokeWidth="2" strokeLinecap="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
               </div>
               <div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#1e40af' }}>NeuroSight Care — Enrolled</div>
-                <div style={{ fontSize: 10, color: '#3b82f6', marginTop: 2 }}>Code: <strong style={{ fontFamily: "'DM Mono',monospace" }}>NS-2026-0042</strong> · Patient · English · Reminder 8:00 PM</div>
-                <div style={{ fontSize: 10, color: '#3b82f6', marginTop: 1 }}>Phone: +94 77 123 4567 · Enrolled 10 May 2026</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#1e40af' }}>{patient?.name || 'Patient'} — Monitoring</div>
+                <div style={{ fontSize: 10, color: '#3b82f6', marginTop: 2 }}>Code: <strong style={{ fontFamily: "'DM Mono',monospace" }}>{patient?.hospitalId || patient?.hospital_id || '—'}</strong> · Live check-ins · Reminder 8:00 PM</div>
+                <div style={{ fontSize: 10, color: '#3b82f6', marginTop: 1 }}>Last active: {lastActive} · Check-ins: {daysWithCheckins} day{daysWithCheckins === 1 ? '' : 's'}</div>
               </div>
             </div>
             <span style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', padding: '3px 10px', borderRadius: 20, background: '#16a34a', color: '#fff' }}>Active</span>
@@ -804,10 +852,10 @@ const PatientDetail = () => {
           <div style={{ borderRadius: 10, border: '1px solid #e2e8f0', background: '#fff', padding: '10px 14px' }}>
             <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#94a3b8', marginBottom: 8 }}>App Usage</div>
             {[
-              { label: 'Language',   value: 'Sinhala' },
+              { label: 'Language',   value: patient?.language || '—' },
               { label: 'User type',  value: 'Patient' },
-              { label: 'Last active',value: 'Today 8:03 PM' },
-              { label: 'Check-ins',  value: '12 of 14 days' },
+              { label: 'Last active',value: lastActive },
+              { label: 'Check-ins',  value: `${daysWithCheckins} day${daysWithCheckins === 1 ? '' : 's'} recorded` },
             ].map(row => (
               <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 5, marginBottom: 5, borderBottom: '1px solid #f1f5f9' }}>
                 <span style={{ fontSize: 10, color: '#64748b' }}>{row.label}</span>
@@ -834,7 +882,7 @@ const PatientDetail = () => {
         {monitoringSubTab === 'checkin' && (
           <>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
-              {[{ label: 'Total Check-ins', value: 7, bg: '#f8fafc', color: '#475569', border: '#e2e8f0' }, { label: 'GREEN', value: 3, bg: '#f0fdf4', color: '#16a34a', border: '#bbf7d0' }, { label: 'AMBER', value: 2, bg: '#fffbeb', color: '#92400e', border: '#fde68a' }, { label: 'RED / Critical', value: 2, bg: '#fef2f2', color: '#dc2626', border: '#fecaca' }].map(s => (
+              {[{ label: 'Total Check-ins', value: stats.total, bg: '#f8fafc', color: '#475569', border: '#e2e8f0' }, { label: 'GREEN', value: stats.green, bg: '#f0fdf4', color: '#16a34a', border: '#bbf7d0' }, { label: 'AMBER', value: stats.amber, bg: '#fffbeb', color: '#92400e', border: '#fde68a' }, { label: 'RED / Critical', value: stats.red, bg: '#fef2f2', color: '#dc2626', border: '#fecaca' }].map(s => (
                 <div key={s.label} style={{ padding: '10px 8px', background: s.bg, border: `1px solid ${s.border}`, borderRadius: 10, textAlign: 'center' }}>
                   <div style={{ fontSize: 20, fontWeight: 800, color: s.color, lineHeight: 1.2 }}>{s.value}</div>
                   <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', color: s.color, opacity: 0.8, marginTop: 2 }}>{s.label}</div>
@@ -844,7 +892,7 @@ const PatientDetail = () => {
             <div>
               <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#475569', marginBottom: 8 }}>Daily Check-in Log</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {DEMO_CHECKINS.map((c, i) => {
+                {checkins.length > 0 ? checkins.map((c, i) => {
                   const lm = levelMeta(c.level);
                   const isOpen = expandedCheckin === i;
                   return (
@@ -876,7 +924,11 @@ const PatientDetail = () => {
                       )}
                     </div>
                   );
-                })}
+                }) : (
+                  <div style={{ padding: 16, borderRadius: 10, border: '1px dashed #e2e8f0', background: '#f8fafc', color: '#64748b', fontSize: 12, textAlign: 'center' }}>
+                    No check-ins found for this patient.
+                  </div>
+                )}
               </div>
             </div>
           </>
@@ -885,9 +937,9 @@ const PatientDetail = () => {
         {/* Symptom reports */}
         {monitoringSubTab === 'symptoms' && (
           <div>
-            <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#dc2626', marginBottom: 8 }}>Recent Alerts <span style={{ background: '#dc2626', color: '#fff', fontSize: 9, fontWeight: 800, padding: '1px 6px', borderRadius: 10, marginLeft: 4 }}>5</span></div>
+            <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#dc2626', marginBottom: 8 }}>Recent Alerts <span style={{ background: '#dc2626', color: '#fff', fontSize: 9, fontWeight: 800, padding: '1px 6px', borderRadius: 10, marginLeft: 4 }}>{alerts.length}</span></div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {DEMO_ALERTS.map((a, i) => (
+              {alerts.length > 0 ? alerts.map((a, i) => (
                 <div key={i} style={{ padding: '9px 12px', borderRadius: 10, border: `1px solid ${a.border}`, background: a.bg, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
                   <span style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', padding: '2px 7px', borderRadius: 10, background: a.color, color: '#fff', flexShrink: 0, marginTop: 1 }}>{a.type}</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -896,7 +948,11 @@ const PatientDetail = () => {
                     <div style={{ fontSize: 9, color: '#94a3b8', fontFamily: "'DM Mono',monospace", marginTop: 2 }}>{a.time}</div>
                   </div>
                 </div>
-              ))}
+              )) : (
+                <div style={{ padding: '14px 12px', borderRadius: 10, border: '1px dashed #e2e8f0', background: '#fff', color: '#64748b', fontSize: 12 }}>
+                  No symptom alerts found for this patient.
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1074,13 +1130,13 @@ const PatientDetail = () => {
         {/* Timeline */}
         {monitoringSubTab === 'timeline' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {[...DEMO_CHECKINS].reverse().map((c, i) => {
+            {checkins.length > 0 ? [...checkins].reverse().map((c, i) => {
               const lm = levelMeta(c.level);
               return (
                 <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
                     <div style={{ width: 10, height: 10, borderRadius: '50%', background: lm.bg, marginTop: 4 }} />
-                    {i < DEMO_CHECKINS.length - 1 && <div style={{ width: 2, flex: 1, minHeight: 24, background: '#e2e8f0', marginTop: 2 }} />}
+                    {i < checkins.length - 1 && <div style={{ width: 2, flex: 1, minHeight: 24, background: '#e2e8f0', marginTop: 2 }} />}
                   </div>
                   <div style={{ flex: 1, paddingBottom: 10 }}>
                     <div style={{ fontSize: 9, color: '#94a3b8', fontFamily: "'DM Mono',monospace", marginBottom: 2 }}>{c.date} · {c.time}</div>
@@ -1092,7 +1148,11 @@ const PatientDetail = () => {
                   </div>
                 </div>
               );
-            })}
+            }) : (
+              <div style={{ fontSize: 12, color: '#64748b', padding: '8px 0' }}>
+                No check-ins found for this patient.
+              </div>
+            )}
           </div>
         )}
 

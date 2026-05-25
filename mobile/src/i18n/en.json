@@ -12,9 +12,9 @@
     "patient": {
       "title": "Welcome Back",
       "sub": "Sign in to your patient account",
-      "idLabel": "Hospital Patient ID",
+        "idLabel": "Patient ID",
       "idPlaceholder": "e.g. NS-00011",
-      "idHint": "Your Hospital ID is on your registration card",
+        "idHint": "Your patient ID is on your registration card",
       "btn": "Sign In",
       "loading": "Signing in…",
       "error": "Invalid Patient ID. Please check and try again.",
@@ -23,9 +23,9 @@
     "caretaker": {
       "title": "Caretaker Sign In",
       "sub": "Sign in to monitor your patient",
-      "idLabel": "Patient's Hospital ID",
+        "idLabel": "Patient ID",
       "idPlaceholder": "e.g. NS-00011",
-      "idHint": "The Hospital ID of the patient you care for",
+        "idHint": "The patient ID of the person you care for",
       "phoneLabel": "Your Phone Number",
       "phonePlaceholder": "e.g. +94 77 123 4567",
       "phoneHint": "The phone number registered with the hospital",
@@ -83,11 +83,11 @@
     }
   },
   "home": {
-    "morning": "Good Morning",
+  "morning": "Good Morning",
     "afternoon": "Good Afternoon",
     "evening": "Good Evening",
     "caretakerViewing": "Viewing records for",
-    "hospitalId": "Hospital ID",
+    "hospitalId": "Patient ID",
     "tumourType": "Tumour Type",
     "riskScore": "Risk Score",
     "notClassified": "Not Classified",

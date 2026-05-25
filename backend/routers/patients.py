@@ -15,6 +15,7 @@ from backend.models.patient import Patient
 from backend.models.caretaker import Caretaker
 from backend.models.chat_message import ChatMessage
 from backend.models.user import User
+from backend.models.checkin import CheckIn
 
 from backend.schemas.patient import PatientCreate, PatientRead, PatientResponse, PatientUpdate, OCRResponse, CaretakerRead
 from pydantic import BaseModel as _BaseModel
@@ -133,6 +134,9 @@ def get_all_patients(db: Session = Depends(get_db), current_user: User = Depends
         out.append(obj)
     return out
 
+
+
+
 # Read One
 @router.get("/{patient_id}", response_model=PatientResponse)
 def get_patient(patient_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
@@ -142,6 +146,46 @@ def get_patient(patient_id: int, db: Session = Depends(get_db), current_user: Us
     obj = PatientResponse.model_validate(patient)
     obj.assigned_doctor = patient.clinician.name if patient.clinician else None
     return obj
+
+
+@router.get("/{patient_id}/checkins")
+def get_patient_checkins(
+    patient_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    patient = db.get(Patient, patient_id)
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+
+    if current_user.role in {"Clinician", "Doctor"} and patient.assigned_doctor_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    rows = (
+        db.query(CheckIn)
+        .filter(CheckIn.patient_id == patient_id)
+        .order_by(CheckIn.id.desc())
+        .all()
+    )
+
+    return [
+        {
+            "id": row.id,
+            "created_at": row.created_at.isoformat() if row.created_at else None,
+            "score": row.score,
+            "level": row.level,
+            "emergency": bool(row.emergency),
+            "trigger_source": row.trigger_source,
+            "headache": row.headache,
+            "seizure": row.seizure,
+            "energy": row.energy,
+            "nausea": row.nausea,
+            "medication": row.medication,
+            "overall": row.overall,
+            "note": row.note,
+        }
+        for row in rows
+    ]
 
 # Update
 @router.put("/{patient_id}", response_model=PatientResponse)
