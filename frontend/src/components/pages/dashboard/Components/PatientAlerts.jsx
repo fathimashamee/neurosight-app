@@ -59,8 +59,8 @@ export default function PatientAlerts() {
 
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--ns-text)", margin: 0 }}>Patient Alerts</h1>
-          <p style={{ fontSize: 13, color: "var(--ns-text-2)", margin: "4px 0 0" }}>Emergency check-ins and clinician notifications.</p>
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--ns-text)", margin: 0 }}>Emergency Alerts</h1>
+          <p style={{ fontSize: 13, color: "var(--ns-text-2)", margin: "4px 0 0" }}>Emergency SOS reports and red-flag check-ins from the mobile app.</p>
         </div>
         <button onClick={() => navigate("/patients")} style={{ background: "#0d9488", color: "#fff", border: "none", borderRadius: 9, padding: "10px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
           View Patients

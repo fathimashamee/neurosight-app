@@ -110,6 +110,7 @@ export default function DashboardLayout({ user, onLogout, onUserUpdate }) {
   const navigate   = useNavigate();
   const profileRef = useRef(null);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [liveEmergency, setLiveEmergency] = useState(null);
 
   const role       = user?.role || "";
   const isAdmin    = ["Super Admin", "Admin"].includes(role);
@@ -129,8 +130,70 @@ export default function DashboardLayout({ user, onLogout, onUserUpdate }) {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  useEffect(() => {
+    let live = true;
+    let lastAlertId = null;
+
+    async function pollAlerts() {
+      try {
+        const token = localStorage.getItem("token");
+        const response = await fetch(`${API_BASE}/dashboard/patient-alerts?limit=3`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (!live || !Array.isArray(data) || data.length === 0) return;
+
+        const newest = data[0];
+        if (newest?.id && newest.id !== lastAlertId) {
+          lastAlertId = newest.id;
+          setLiveEmergency(newest);
+        }
+      } catch {
+        // silent polling fallback
+      }
+    }
+
+    pollAlerts();
+    const timer = setInterval(pollAlerts, 5000);
+    return () => {
+      live = false;
+      clearInterval(timer);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!liveEmergency) return undefined;
+    const timer = setTimeout(() => setLiveEmergency(null), 12000);
+    return () => clearTimeout(timer);
+  }, [liveEmergency]);
+
   return (
     <div style={{ background: "var(--ns-bg)", fontFamily: "'DM Sans', sans-serif" }}>
+      {liveEmergency && (
+        <div style={{ position: "fixed", top: 76, right: 18, zIndex: 120, width: 360, maxWidth: "calc(100vw - 24px)", background: "linear-gradient(180deg, #fff5f5, #fff)", border: "1px solid #fecaca", borderLeft: "5px solid #dc2626", borderRadius: 16, boxShadow: "0 18px 48px rgba(220,38,38,0.18)", overflow: "hidden" }}>
+          <div style={{ padding: 14, display: "flex", gap: 12, alignItems: "flex-start" }}>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: "#dc2626", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 22, flexShrink: 0 }}>🚨</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: "0.1em", textTransform: "uppercase", color: "#b91c1c" }}>Live Emergency Alert</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: "#7f1d1d", marginTop: 4 }}>{liveEmergency.patient_name || "Unknown patient"}</div>
+              <div style={{ fontSize: 12, color: "#991b1b", marginTop: 4 }}>{liveEmergency.hospital_id || ""}</div>
+              <div style={{ fontSize: 13, color: "#334155", marginTop: 8, lineHeight: 1.5 }}>{liveEmergency.message}</div>
+            </div>
+            <button onClick={() => setLiveEmergency(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "#b91c1c", fontSize: 18, lineHeight: 1 }}>×</button>
+          </div>
+          <div style={{ display: "flex", gap: 8, padding: "0 14px 14px" }}>
+            <button onClick={() => { setLiveEmergency(null); navigate("/patient-alerts"); }} style={{ flex: 1, border: "1px solid #fecaca", background: "#fff", color: "#7f1d1d", borderRadius: 10, padding: "9px 10px", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>
+              Open Alerts
+            </button>
+            {liveEmergency.patient_id && (
+              <button onClick={() => { setLiveEmergency(null); navigate(`/patients/${liveEmergency.patient_id}`); }} style={{ flex: 1, border: "none", background: "#dc2626", color: "#fff", borderRadius: 10, padding: "9px 10px", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>
+                Open Patient
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ══════════ HEADER — fixed full width ══════════ */}
         <header style={{

@@ -13,6 +13,7 @@ import Result from './screens/Result'
 import Chat from './screens/Chat'
 import Report from './screens/Report'
 import Education from './screens/Education'
+import Emergency from './screens/Emergency'
 
 function ComingSoon({ title }) {
   const navigate = useNavigate()
@@ -89,7 +90,7 @@ export default function App() {
               <Route path="/result"    element={<Result />} />
               <Route path="/chat"      element={<Chat />} />
               <Route path="/symptom"   element={<ComingSoon title="Report Symptom" />} />
-              <Route path="/emergency" element={<ComingSoon title="Emergency" />} />
+              <Route path="/emergency" element={<Emergency />} />
             </Routes>
           </div>
         </div>

@@ -17,6 +17,7 @@ This guide explains how to set up both the **backend (FastAPI + PostgreSQL)** an
 * [Frontend Setup](#frontend-setup)
 * [Testing the Database Connection](#testing-the-database-connection)
 * [Running the Project](#running-the-project)
+* [Emergency Workflow](#emergency-workflow)
 * [Creating a New User](#creating-a-new-user)
 * [Project Structure](#project-structure)
 * [License](#license)
@@ -202,6 +203,7 @@ Final project/
    ```
 4. Access the app via the frontend URL and test API endpoints in:
    [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+
 
 ---
 

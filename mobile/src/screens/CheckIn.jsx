@@ -330,6 +330,41 @@ export default function CheckIn() {
   const seizureSelected = answers.seizure && answers.seizure !== 'No'
   const severeHeadacheSelected = answers.headache === 'Severe (very bad)'
   const repeatedVomitingSelected = answers.nausea === 'Vomited many times'
+  const emergencyActionStyle = {
+    minHeight: 46,
+    padding: '10px 12px',
+    borderRadius: 10,
+    fontSize: 14,
+    background: '#0f766e',
+    color: '#fff',
+    fontWeight: 800,
+    border: 'none',
+    cursor: 'pointer',
+    lineHeight: 1.15,
+    boxSizing: 'border-box',
+  }
+  const emergencyOutlineStyle = {
+    ...emergencyActionStyle,
+    background: '#fff',
+    color: '#b91c1c',
+    border: '1px solid #fecaca',
+  }
+  const emergencyDialStyle = {
+    ...emergencyActionStyle,
+    background: '#ef4444',
+  }
+  const emergencyNotifyStyle = {
+    ...emergencyActionStyle,
+    background: '#f97316',
+  }
+  const emergencySubmitStyle = {
+    ...emergencyActionStyle,
+    background: '#0f766e',
+  }
+  const emergencyComboStyle = {
+    ...emergencyActionStyle,
+    background: '#b91c1c',
+  }
 
   function choose(optionLabel, key = current.key) {
     setError('')
@@ -407,9 +442,7 @@ export default function CheckIn() {
           <div style={{ fontSize:13, color:'rgba(255,255,255,0.74)', marginTop:6 }}>Start anytime with Daily Check-in.</div>
         </div>
 
-        <div style={{ position:'absolute', top:16, right:16 }}>
-           {/* Button removed to hide additional questions */}
-        </div>
+        {/* top-right emergency shortcut removed per request */}
 
       </div>
 
@@ -506,7 +539,7 @@ export default function CheckIn() {
             <div style={{ fontSize:15, fontWeight:900, color:'#7f1d1d', marginBottom:8 }}>Emergency escalation</div>
             <div style={{ fontSize:13, color:'#7f1d1d', marginBottom:10 }}>This submission contains red‑flag symptoms. You can call emergency services or notify your clinician immediately.</div>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(2, minmax(0, 1fr))', gap:8, marginBottom:6 }}>
-              <a href="tel:1990" style={{ minHeight:46, display:'flex', alignItems:'center', justifyContent:'center', textAlign:'center', padding:'10px 12px', borderRadius:10, background:'#ef4444', color:'#fff', fontWeight:800, textDecoration:'none', lineHeight:1.15, boxSizing:'border-box' }}>Call Emergency</a>
+              <a href="tel:1990" onClick={(e) => { try { window.location.href = 'tel:1990' } catch(_){} }} style={{ ...emergencyDialStyle, display:'flex', alignItems:'center', justifyContent:'center', textAlign:'center', textDecoration:'none' }}>Call Emergency</a>
               <button disabled={notifyLoading} onClick={async () => {
                 setNotifyLoading(true)
                 setNotifyResult('')
@@ -519,30 +552,28 @@ export default function CheckIn() {
                 } finally {
                   setNotifyLoading(false)
                 }
-              }} style={{ minHeight:46, padding:'10px 12px', borderRadius:10, background:'#f97316', color:'#fff', fontWeight:800, border:'none', cursor:'pointer', lineHeight:1.15, boxSizing:'border-box' }}>{notifyLoading ? 'Notifying…' : 'Notify Clinician'}</button>
+              }} style={emergencyNotifyStyle}>{notifyLoading ? 'Notifying…' : 'Notify Clinician'}</button>
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(2, minmax(0, 1fr))', gap:8 }}>
+              <button onClick={() => navigate('/emergency')} style={emergencyOutlineStyle}>Open SOS</button>
               <button disabled={submitting} onClick={async () => {
-                // Submit then notify clinician if possible
                 try {
                   await submit()
-                } catch (e) {
-                }
-              }} style={{ minHeight:46, padding:'10px 12px', borderRadius:10, background:'#0f766e', color:'#fff', fontWeight:800, border:'none', cursor:'pointer', lineHeight:1.15, boxSizing:'border-box' }}>Submit Check‑in</button>
+                } catch (e) {}
+              }} style={emergencySubmitStyle}>Submit Check‑in</button>
               <button disabled={notifyLoading || submitting} onClick={async () => {
                 setNotifyLoading(true)
                 setNotifyResult('')
                 try {
                   const msg = `Urgent: ${patient.name || patient.hospital_id || 'patient'} reports red‑flag symptoms via Daily Check‑in.`
                   await api('/mobile/notify', { method: 'POST', body: { message: msg } })
-                  // then submit
                   await submit()
                 } catch (e) {
                   setNotifyResult('Failed to notify and submit')
                 } finally {
                   setNotifyLoading(false)
                 }
-              }} style={{ minHeight:46, padding:'10px 12px', borderRadius:10, background:'#b91c1c', color:'#fff', fontWeight:800, border:'none', cursor:'pointer', lineHeight:1.15, boxSizing:'border-box' }}>Notify & Submit</button>
+              }} style={{ ...emergencyComboStyle, gridColumn:'1 / -1' }}>Notify & Submit</button>
             </div>
             {notifyResult && <div style={{ marginTop:10, fontSize:13, color:'#334155' }}>{notifyResult}</div>}
           </div>
