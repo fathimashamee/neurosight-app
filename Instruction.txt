@@ -111,3 +111,17 @@ the TF-IDF classifier (Step 2) — no crash, but reduced answer quality.
 	npm run dev
 4. Open URL shown by Vite (usually http://localhost:5174).
 
+10) Emergency feature (SOS alerts)
+- Purpose: mobile SOS sends structured alerts to `/mobile/notify`. The backend persists an emergency `ChatMessage` and emits a realtime `emergency_alert` event to clinician dashboards via Socket.IO.
+- Install Socket.IO client (frontend):
+		cd frontend
+		npm install --save socket.io-client
+- Dev run order to test locally:
+		1. Start backend: `npm run dev` (or `uvicorn backend.main:app --reload --port 8000`)
+		2. Start frontend dashboard: `cd frontend && npm run dev`
+		3. Start mobile app: `cd mobile && npm run dev`
+		4. Trigger SOS from mobile; verify alerts appear on dashboard and realtime popup
+- Notes:
+	- `socket.io-client` is required by the dashboard to receive live emergency alerts (push). Without it the dashboard will only show alerts via polling endpoints.
+	- Geolocation (`navigator.geolocation`) requires HTTPS on devices; `localhost` works for most dev setups.
+	

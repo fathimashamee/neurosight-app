@@ -17,6 +17,7 @@ This guide explains how to set up both the **backend (FastAPI + PostgreSQL)** an
 * [Frontend Setup](#frontend-setup)
 * [Testing the Database Connection](#testing-the-database-connection)
 * [Running the Project](#running-the-project)
+* [Emergency Workflow](#emergency-workflow)
 * [Creating a New User](#creating-a-new-user)
 * [Project Structure](#project-structure)
 * [License](#license)
@@ -188,20 +189,65 @@ Final project/
 ---
 
 ## 🚀 Running the Project
+1. Start PostgreSQL and ensure the `brain_tumor` database exists.
 
-1. **Start PostgreSQL** and ensure the `brain_tumor` database exists.
-2. **Run the backend**:
+2. Backend (FastAPI)
+
+   ```powershell
+   cd backend
+   py -3.11 -m venv .venv
+   .\.venv\Scripts\Activate
+   python -m pip install --upgrade pip setuptools wheel
+   pip install --no-cache-dir -r requirements.txt
+   copy .env.example .env
+   # edit backend/.env to set DATABASE_URL and SECRET_KEY
+   uvicorn backend.main:app --reload --port 8000
+   ```
+
+   API docs: http://127.0.0.1:8000/docs
+
+3. Frontend (dashboard)
 
    ```bash
+   cd frontend
+   npm install
    npm run dev
    ```
-3. **Run the frontend**:
+
+   Open the URL shown by Vite (usually http://localhost:5173).
+
+4. Mobile app (Vite)
 
    ```bash
+   cd mobile
+   npm install
    npm run dev
    ```
-4. Access the app via the frontend URL and test API endpoints in:
-   [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+
+   Open the URL shown by Vite (usually http://localhost:5174) or open on a device/emulator.
+
+5. Chatbot microservice (optional)
+
+   ```powershell
+   # inside backend venv
+   pip install -r backend/chatbot/requirements.txt
+   uvicorn backend.chatbot.microservice:app --port 8001
+   ```
+
+6. Emergency realtime (Socket.IO)
+
+   - The clinician dashboard uses `socket.io-client` to receive live `emergency_alert` events emitted by the backend when `/mobile/notify` is called.
+   - Ensure `socket.io-client` is installed in `frontend`:
+
+     ```bash
+     cd frontend
+     npm install --save socket.io-client
+     ```
+
+   - Run backend + frontend + mobile; trigger SOS from mobile to see realtime popup on the dashboard.
+
+
+
 
 ---
 
