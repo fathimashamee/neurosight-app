@@ -1,4 +1,6 @@
+import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom'
+import { api } from './api'
 import BottomNav  from './screens/BottomNav'
 import BackButton from './screens/BackButton'
 
@@ -16,6 +18,7 @@ import Chat from './screens/Chat'
 import Report from './screens/Report'
 import Education from './screens/Education'
 import Emergency from './screens/Emergency'
+import ReportSymptom from './screens/ReportSymptom'
 
 /* Routes that show the bottom navigation bar */
 const NAV_ROUTES = new Set(['/home', '/checkin', '/chat', '/education', '/report'])
@@ -46,6 +49,37 @@ function ComingSoon({ title }) {
 }
 
 /* ─────────────────────────────────────────────────────────────
+   EnrollmentHandler — reads ?token= on first load, verifies it,
+   stores hospital_id for Login to pre-fill, then redirects.
+───────────────────────────────────────────────────────────── */
+function EnrollmentHandler() {
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const token = params.get('token')
+    if (!token) return
+
+    // Remove token from URL without triggering a re-render
+    window.history.replaceState({}, '', window.location.pathname)
+
+    api(`/enrollment/verify?token=${encodeURIComponent(token)}`)
+      .then(data => {
+        if (data.valid) {
+          localStorage.setItem('enrollment_prefill', data.hospital_id)
+          localStorage.setItem('enrollment_name', data.patient_name || '')
+          navigate('/language', { replace: true })
+        }
+      })
+      .catch(() => {
+        // Invalid/expired token — let the app load normally
+      })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  return null
+}
+
+/* ─────────────────────────────────────────────────────────────
    AppShell — flex column that sits inside the phone frame.
    On main routes: scrollable content area + BottomNav bar.
    On auth / transient routes: full-height content only.
@@ -69,6 +103,7 @@ function AppShell() {
           msOverflowStyle:  'none',
         }}
       >
+        <EnrollmentHandler />
         <Routes>
           <Route path="/"          element={<Welcome />} />
           <Route path="/language"  element={<LanguageSelect />} />
@@ -80,7 +115,7 @@ function AppShell() {
           <Route path="/checkin"   element={<CheckIn />} />
           <Route path="/result"    element={<Result />} />
           <Route path="/chat"      element={<Chat />} />
-          <Route path="/symptom"   element={<ComingSoon title="Report Symptom" />} />
+          <Route path="/symptom"   element={<ReportSymptom />} />
           <Route path="/emergency" element={<Emergency />} />
         </Routes>
       </div>

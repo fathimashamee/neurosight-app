@@ -364,6 +364,11 @@ class NotifyRequest(BaseModel):
     message: str
 
 
+class SymptomReportRequest(BaseModel):
+    symptom_type: str
+    description: str | None = None
+
+
 # ── endpoints ────────────────────────────────────────────────────────────────
 
 @router.post("/login")
@@ -614,6 +619,36 @@ def notify_clinician(
     db.refresh(chat)
 
     return {"notified": True, "id": chat.id, "message": "Clinician notified (dev)"}
+
+
+@router.post("/symptom-report")
+def report_symptom(
+    body: SymptomReportRequest,
+    auth: tuple[Patient, str] = Depends(get_mobile_patient),
+    db: Session = Depends(get_db),
+):
+    """Store a non-emergency irregular symptom reported by the patient."""
+    patient, _role = auth
+    symptom_type = (body.symptom_type or "").strip()
+    if not symptom_type:
+        from fastapi import HTTPException as _H
+        raise _H(status_code=400, detail="symptom_type is required")
+
+    parts = [f"New symptom: {symptom_type}"]
+    if body.description and body.description.strip():
+        parts.append(f"Details: {body.description.strip()}")
+
+    chat = ChatMessage(
+        patient_id=patient.id,
+        user_message=" | ".join(parts),
+        bot_reply="Received by care team",
+        topic="symptom_report",
+        emergency=False,
+    )
+    db.add(chat)
+    db.commit()
+    db.refresh(chat)
+    return {"saved": True, "id": chat.id}
 
 
 @router.get("/chat/history", response_model=list[ChatHistoryItem])

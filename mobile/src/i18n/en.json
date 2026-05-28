@@ -137,6 +137,35 @@
     "notes": "Notes",
     "footerNote": "This report is prepared by your medical team. Discuss any questions with your doctor or nurse."
   },
+  "symptom": {
+    "title": "Report a New Symptom",
+    "subtitle": "Noticed something unusual? Let your care team know",
+    "purposeTitle": "What is this for?",
+    "purposeText": "Use this page to report any new or irregular symptom you have noticed that is not an emergency. Your doctor will review it.",
+    "hintEmergency": "Having a seizure, severe headache, or other urgent problem? Use the Emergency SOS button instead.",
+    "hintCheckin": "For your regular daily symptoms (headache, energy, sleep), use the Daily Check-in.",
+    "selectType": "What are you experiencing?",
+    "describeLabel": "Tell us more (optional)",
+    "describePlaceholder": "When did you first notice it? How does it feel? Any other details…",
+    "describeHint": "Even a short description helps your doctor understand the symptom better.",
+    "submit": "Send to Care Team",
+    "submitting": "Sending…",
+    "successTitle": "Symptom reported",
+    "successMsg": "Your care team has received your report and will review it at the next available opportunity.",
+    "backHome": "Back to Home",
+    "errorSend": "Unable to send the report. Please check your connection and try again.",
+    "types": {
+      "headache":  "Headache",
+      "dizziness": "Dizziness",
+      "nausea":    "Nausea",
+      "vision":    "Vision changes",
+      "fatigue":   "Fatigue",
+      "memory":    "Memory / Confusion",
+      "speech":    "Speech difficulty",
+      "tingling":  "Tingling / Numbness",
+      "other":     "Other"
+    }
+  },
   "education": {
     "title": "About My Condition",
     "back": "← Back",

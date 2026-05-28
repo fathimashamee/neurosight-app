@@ -171,9 +171,13 @@ const PatientDetail = () => {
   const [chatHistory, setChatHistory] = useState([]);
   const [chatLoading, setChatLoading] = useState(false);
   const [monitoringAlerts, setMonitoringAlerts] = useState([]);
+  const [symptomReports, setSymptomReports] = useState([]);
   const [caretakers, setCaretakers] = useState([]);
   const [caretakerEdits, setCaretakerEdits] = useState({});
   const [caretakerUpdateSaving, setCaretakerUpdateSaving] = useState(null);
+  const [enrollmentStatus, setEnrollmentStatus] = useState(null);
+  const [enrolling, setEnrolling] = useState(false);
+  const [enrollResult, setEnrollResult] = useState(null);
   const [newCaretaker, setNewCaretaker] = useState({ name: '', phone: '', relation: '' });
   const [caretakerSaving, setCaretakerSaving] = useState(false);
   const [newPlanForm, setNewPlanForm] = useState({
@@ -215,12 +219,21 @@ const PatientDetail = () => {
       } catch (e) {
         setMonitoringAlerts([]);
       }
+      // fetch non-emergency symptom reports submitted via the mobile Report Symptom page
+      try {
+        const reports = await api(`/dashboard/symptom-reports/${id}`).catch(() => []);
+        setSymptomReports(Array.isArray(reports) ? reports : []);
+      } catch (e) {
+        setSymptomReports([]);
+      }
       setEditData(prev => ({ ...prev, documents: docs }));
       setPatientAdmissions(admissions);
       setTreatmentPlans(Array.isArray(plans) ? plans : []);
       const ctList = Array.isArray(ctakers) ? ctakers : [];
       setCaretakers(ctList);
       setCaretakerEdits(Object.fromEntries(ctList.map(ct => [ct.id, { name: ct.name, phone: ct.phone, relation: ct.relation || '' }])));
+
+      api(`/enrollment/${id}/status`).then(s => setEnrollmentStatus(s)).catch(() => {});
     } catch (err) {
       console.error("Failed to fetch patient", err);
     } finally {
@@ -766,6 +779,20 @@ const PatientDetail = () => {
     );
   };
 
+  const handleEnroll = async () => {
+    setEnrolling(true);
+    setEnrollResult(null);
+    try {
+      const res = await api(`/enrollment/${id}`, { method: 'POST' });
+      setEnrollResult(res);
+      setEnrollmentStatus({ enrolled: true, status: 'sent' });
+    } catch (err) {
+      setEnrollResult({ success: false, error: err.message });
+    } finally {
+      setEnrolling(false);
+    }
+  };
+
   const renderMonitoringTab = () => {
     const checkins = (monitoringCheckins || []).map(c => {
       // transform backend shape to what the UI expects
@@ -815,10 +842,11 @@ const PatientDetail = () => {
     const levelMeta = l => ({ CRITICAL: { bg: '#4c0519', text: '#fff', label: 'CRITICAL' }, RED: { bg: '#dc2626', text: '#fff', label: 'RED' }, AMBER: { bg: '#f59e0b', text: '#fff', label: 'AMBER' }, GREEN: { bg: '#16a34a', text: '#fff', label: 'GREEN' } }[l] || { bg: '#94a3b8', text: '#fff', label: l });
 
     const MON_TABS = [
-      { key: 'checkin',  label: 'Check-in history' },
-      { key: 'symptoms', label: 'Symptom reports' },
-      { key: 'chat',     label: 'Chat history' },
-      { key: 'timeline', label: 'Timeline' },
+      { key: 'checkin',        label: 'Check-in history' },
+      { key: 'emergency',      label: 'Emergency' },
+      { key: 'symptom_report', label: 'Symptom report' },
+      { key: 'chat',           label: 'Chat history' },
+      { key: 'timeline',       label: 'Timeline' },
     ];
 
     return (
@@ -837,9 +865,58 @@ const PatientDetail = () => {
                 <div style={{ fontSize: 10, color: '#3b82f6', marginTop: 1 }}>Last active: {lastActive} · Check-ins: {daysWithCheckins} day{daysWithCheckins === 1 ? '' : 's'}</div>
               </div>
             </div>
-            <span style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', padding: '3px 10px', borderRadius: 20, background: '#16a34a', color: '#fff' }}>Active</span>
+            {/* Enroll / status button — Doctor, Clinician, Super Admin, Assistant */}
+            {['Doctor', 'Clinician', 'Super Admin', 'Assistant'].includes(currentUser.role) && (() => {
+              const st = enrollmentStatus?.status;
+              if (st === 'active') {
+                return <span style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', padding: '3px 10px', borderRadius: 20, background: '#16a34a', color: '#fff' }}>Active</span>;
+              }
+              if (st === 'sent') {
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                    <span style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', padding: '3px 10px', borderRadius: 20, background: '#f59e0b', color: '#fff' }}>Link Sent</span>
+                    <button onClick={handleEnroll} disabled={enrolling}
+                      style={{ fontSize: 9, fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', cursor: 'pointer' }}>
+                      Resend
+                    </button>
+                  </div>
+                );
+              }
+              return (
+                <button onClick={handleEnroll} disabled={enrolling}
+                  style={{ fontSize: 11, fontWeight: 700, padding: '6px 16px', borderRadius: 8, background: enrolling ? '#94a3b8' : '#0d9488', color: '#fff', border: 'none', cursor: enrolling ? 'not-allowed' : 'pointer', flexShrink: 0 }}>
+                  {enrolling ? 'Enrolling…' : 'Enroll'}
+                </button>
+              );
+            })()}
           </div>
         </div>
+
+        {/* Enroll result banner */}
+        {enrollResult && (
+          <div style={{ padding: '10px 14px', borderRadius: 10, border: `1px solid ${enrollResult.success ? '#bbf7d0' : '#fecaca'}`, background: enrollResult.success ? '#f0fdf4' : '#fef2f2', display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: enrollResult.success ? '#15803d' : '#b91c1c' }}>
+              {enrollResult.success ? 'Patient enrolled successfully' : 'Enrollment failed'}
+            </div>
+            {enrollResult.success && (
+              <>
+                {enrollResult.email_sent && <div style={{ fontSize: 10, color: '#15803d' }}>Email sent to patient</div>}
+                {enrollResult.sms_sent && <div style={{ fontSize: 10, color: '#15803d' }}>SMS sent to patient</div>}
+                {!enrollResult.email_sent && !enrollResult.sms_sent && (
+                  <div style={{ fontSize: 10, color: '#92400e' }}>No email/SMS configured — share this link manually:</div>
+                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                  <input readOnly value={enrollResult.link} style={{ flex: 1, fontSize: 10, padding: '4px 8px', border: '1px solid #bbf7d0', borderRadius: 6, background: '#fff', fontFamily: "'DM Mono',monospace", color: '#0f172a' }} />
+                  <button onClick={() => { navigator.clipboard.writeText(enrollResult.link); }}
+                    style={{ fontSize: 10, fontWeight: 700, padding: '4px 8px', borderRadius: 6, background: '#0d9488', color: '#fff', border: 'none', cursor: 'pointer', flexShrink: 0 }}>
+                    Copy
+                  </button>
+                </div>
+              </>
+            )}
+            <button onClick={() => setEnrollResult(null)} style={{ alignSelf: 'flex-end', fontSize: 9, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', marginTop: 2 }}>Dismiss</button>
+          </div>
+        )}
 
         {/* Next visit + App usage */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
@@ -934,10 +1011,13 @@ const PatientDetail = () => {
           </>
         )}
 
-        {/* Symptom reports */}
-        {monitoringSubTab === 'symptoms' && (
+        {/* Emergency alerts */}
+        {monitoringSubTab === 'emergency' && (
           <div>
-            <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#dc2626', marginBottom: 8 }}>Recent Alerts <span style={{ background: '#dc2626', color: '#fff', fontSize: 9, fontWeight: 800, padding: '1px 6px', borderRadius: 10, marginLeft: 4 }}>{alerts.length}</span></div>
+            <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#dc2626', marginBottom: 8 }}>
+              Emergency Alerts
+              <span style={{ background: '#dc2626', color: '#fff', fontSize: 9, fontWeight: 800, padding: '1px 6px', borderRadius: 10, marginLeft: 6 }}>{alerts.length}</span>
+            </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {alerts.length > 0 ? alerts.map((a, i) => (
                 <div key={i} style={{ padding: '9px 12px', borderRadius: 10, border: `1px solid ${a.border}`, background: a.bg, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
@@ -950,7 +1030,80 @@ const PatientDetail = () => {
                 </div>
               )) : (
                 <div style={{ padding: '14px 12px', borderRadius: 10, border: '1px dashed #e2e8f0', background: '#fff', color: '#64748b', fontSize: 12 }}>
-                  No symptom alerts found for this patient.
+                  No emergency alerts for this patient.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Symptom reports — non-emergency new symptoms submitted from mobile */}
+        {monitoringSubTab === 'symptom_report' && (
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#0d9488', marginBottom: 4 }}>
+              Patient-Reported Symptoms
+              <span style={{ background: '#0d9488', color: '#fff', fontSize: 9, fontWeight: 800, padding: '1px 6px', borderRadius: 10, marginLeft: 6 }}>{symptomReports.length}</span>
+            </div>
+            <div style={{ fontSize: 11, color: '#64748b', marginBottom: 10 }}>
+              Irregular symptoms the patient has flagged outside of daily check-in or emergency.
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {symptomReports.length > 0 ? symptomReports.map((r, i) => {
+                const dt = r.created_at ? new Date(r.created_at) : null;
+                const dateStr = dt ? dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+                const timeStr = dt ? dt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '';
+
+                // Parse "New symptom: X, Y | Details: Z" into structured parts
+                const parts = (r.message || '').split(' | ');
+                const symptomLine = parts.find(p => p.startsWith('New symptom:'));
+                const detailLine  = parts.find(p => p.startsWith('Details:'));
+                const symptoms    = symptomLine ? symptomLine.replace('New symptom:', '').trim().split(',').map(s => s.trim()).filter(Boolean) : [];
+                const details     = detailLine  ? detailLine.replace('Details:', '').trim() : '';
+
+                return (
+                  <div key={i} style={{ borderRadius: 14, border: '1px solid #ccfbf1', background: '#fff', overflow: 'hidden' }}>
+                    {/* Coloured header bar */}
+                    <div style={{ background: '#f0fdfa', borderBottom: '1px solid #ccfbf1', padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0f766e" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                          <circle cx="12" cy="12" r="10" /><path d="M12 8v4l3 3" />
+                        </svg>
+                        <span style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#0f766e' }}>Symptom Report</span>
+                      </div>
+                      <span style={{ fontSize: 10, fontWeight: 600, color: '#5eead4', fontFamily: "'DM Mono',monospace", whiteSpace: 'nowrap' }}>
+                        {dateStr}{timeStr ? ` · ${timeStr}` : ''}
+                      </span>
+                    </div>
+
+                    {/* Body */}
+                    <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {/* Symptom chips */}
+                      {symptoms.length > 0 && (
+                        <div>
+                          <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#94a3b8', marginBottom: 6 }}>Reported Symptoms</div>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                            {symptoms.map((s, si) => (
+                              <span key={si} style={{ fontSize: 11, fontWeight: 700, color: '#0f766e', background: '#ccfbf1', border: '1px solid #99f6e4', borderRadius: 20, padding: '3px 10px' }}>
+                                {s}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Patient description */}
+                      {details && (
+                        <div>
+                          <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#94a3b8', marginBottom: 4 }}>Patient's Description</div>
+                          <div style={{ fontSize: 12, color: '#334155', lineHeight: 1.6, fontStyle: 'italic' }}>"{details}"</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              }) : (
+                <div style={{ padding: '16px 12px', borderRadius: 10, border: '1px dashed #e2e8f0', background: '#f8fafc', color: '#64748b', fontSize: 12, textAlign: 'center' }}>
+                  No symptom reports submitted by this patient yet.
                 </div>
               )}
             </div>
