@@ -27,9 +27,18 @@ Prerequisites
 	pip install --no-cache-dir -r requirements.txt
 6. Create environment file:
 	copy .env.example .env
-7. Edit .env and set real values (especially DATABASE_URL and SECRET_KEY).
+7. Edit .env and set real values:
+	- DATABASE_URL: change the password to your own PostgreSQL password
+	- SECRET_KEY: keep as-is (same for all team members)
+	- Add SMTP settings from section 11 if you want email enrollment to work
 8. Return to project root:
 	cd ..
+
+IMPORTANT — One-time warning for existing team members:
+	backend/.env has been removed from git tracking (it should never have been committed).
+	The next time you pull from stage-01, git will DELETE your local backend/.env.
+	Before pulling: copy your backend/.env to a safe place (e.g. Desktop).
+	After pulling: put it back. Future pulls will never touch it again.
 
 4) Run Backend (Current Method)
 1. From project root, run:
@@ -111,6 +120,7 @@ the TF-IDF classifier (Step 2) — no crash, but reduced answer quality.
 	npm run dev
 4. Open URL shown by Vite (usually http://localhost:5174).
 
+
 10) Emergency feature (SOS alerts)
 - Purpose: mobile SOS sends structured alerts to `/mobile/notify`. The backend persists an emergency `ChatMessage` and emits a realtime `emergency_alert` event to clinician dashboards via Socket.IO.
 - Install Socket.IO client (frontend):
@@ -124,4 +134,44 @@ the TF-IDF classifier (Step 2) — no crash, but reduced answer quality.
 - Notes:
 	- `socket.io-client` is required by the dashboard to receive live emergency alerts (push). Without it the dashboard will only show alerts via polling endpoints.
 	- Geolocation (`navigator.geolocation`) requires HTTPS on devices; `localhost` works for most dev setups.
+
+11) Mobile Enrollment & Email Setup
+The patient enrollment feature sends an app link + patient ID to the patient's email
+when a Clinician/Assistant clicks "Enroll" on the patient's Monitoring tab.
+
+Mobile PWA is deployed at: https://neurosight-app.vercel.app
+
+--- Step A: Add SMTP settings to your backend/.env ---
+Each team member has their own .env (never committed to git).
+Add these lines to backend/.env (get SMTP_PASSWORD from Fathima Shameeha via WhatsApp):
+
+	MOBILE_APP_URL=https://neurosight-app.vercel.app
+	SMTP_HOST=smtp.gmail.com
+	SMTP_PORT=587
+	SMTP_USER=neurosight.care@gmail.com
+	SMTP_PASSWORD="get this from Fathima Shameeha via WhatsApp"
+	EMAILS_FROM_EMAIL=neurosight.care@gmail.com
+
+--- Step B: Testing on a real phone ---
+Each person uses their own local backend and database.
+ngrok creates a public URL so your phone can reach your laptop's backend.
+
+Your steps:
+	1. Start your backend: npm run dev  (from project root)
+	2. Open a second terminal and run ngrok:
+	   .\ngrok.exe http 8000
+	   (ngrok.exe is already in the project root)
+	3. First time only — add your ngrok authtoken (sign up free at dashboard.ngrok.com):
+	   .\ngrok.exe config add-authtoken YOUR_TOKEN
+	4. Copy the URL ngrok shows (e.g. https://abc123.ngrok-free.app)
+	5. Send the URL to Fathima Shameeha — she will update VITE_API_URL in Vercel and redeploy
+	   (only she has access to the Vercel project)
+	6. Once redeployed, open https://neurosight-app.vercel.app on your phone — login will work
+
+Note: ngrok URL changes every time it restarts. Repeat steps 2–6 each session.
+
+--- Demo day (laptop only, no phone needed) ---
+	- Run backend: npm run dev
+	- Run mobile: cd mobile && npm run dev
+	- Open http://localhost:5174 in browser — no ngrok or Vercel changes needed
 	

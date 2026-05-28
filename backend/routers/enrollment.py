@@ -30,7 +30,7 @@ def _make_enrollment_token(patient_id: int, hospital_id: str) -> str:
     )
 
 
-def _send_email(to: str, patient_name: str, link: str) -> bool:
+def _send_email(to: str, patient_name: str, link: str, hospital_id: str = "") -> bool:
     if not all([settings.SMTP_HOST, settings.SMTP_USER, settings.SMTP_PASSWORD]):
         return False
     try:
@@ -46,6 +46,11 @@ def _send_email(to: str, patient_name: str, link: str) -> bool:
           <a href="{link}" style="display:inline-block;background:#0d9488;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:bold;font-size:16px;margin:12px 0">
             Open NeuroSight App
           </a>
+          <div style="margin:16px 0;padding:12px 18px;background:#f0fdfa;border:1px solid #99f6e4;border-radius:8px;display:inline-block">
+            <p style="margin:0;font-size:12px;color:#0f766e;font-weight:600;text-transform:uppercase;letter-spacing:0.08em">Your Patient ID</p>
+            <p style="margin:4px 0 0;font-size:22px;font-weight:800;color:#0d9488;letter-spacing:0.1em">{hospital_id}</p>
+            <p style="margin:4px 0 0;font-size:11px;color:#64748b">Enter this when signing in to the app</p>
+          </div>
           <p style="color:#64748b;font-size:13px">This link expires in {_TOKEN_DAYS} days.<br>
           If you did not expect this message, please ignore it.</p>
         </body></html>"""
@@ -60,7 +65,7 @@ def _send_email(to: str, patient_name: str, link: str) -> bool:
         return False
 
 
-def _send_sms(phone: str, link: str) -> bool:
+def _send_sms(phone: str, link: str, hospital_id: str = "") -> bool:
     """Send SMS via Twilio if configured."""
     sid = getattr(settings, "TWILIO_ACCOUNT_SID", None)
     token = getattr(settings, "TWILIO_AUTH_TOKEN", None)
@@ -70,7 +75,11 @@ def _send_sms(phone: str, link: str) -> bool:
     try:
         from twilio.rest import Client
         Client(sid, token).messages.create(
-            body=f"Your NeuroSight app is ready. Tap to install: {link}",
+            body=(
+                f"Your NeuroSight care app is ready.\n"
+                f"Open: {link}\n"
+                f"Your code: {hospital_id}"
+            ),
             from_=from_num,
             to=phone,
         )
@@ -120,8 +129,8 @@ def enroll_patient(
         db.add(enrollment)
 
     # Attempt delivery
-    email_sent = _send_email(patient.email, patient.name, link) if patient.email else False
-    sms_sent = _send_sms(patient.phone, link) if patient.phone else False
+    email_sent = _send_email(patient.email, patient.name, link, patient.hospital_id) if patient.email else False
+    sms_sent = _send_sms(patient.phone, link, patient.hospital_id) if patient.phone else False
 
     if email_sent and sms_sent:
         enrollment.send_method = "both"

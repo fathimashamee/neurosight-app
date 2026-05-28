@@ -127,7 +127,20 @@ function AppShell() {
   )
 }
 
+const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) || window.innerWidth <= 768
+
 export default function App() {
+  if (isMobile) {
+    return (
+      <BrowserRouter>
+        <style>{hideScrollbar}</style>
+        <div style={{ width: '100%', height: '100vh', display: 'flex', flexDirection: 'column', background: '#fff' }}>
+          <AppShell />
+        </div>
+      </BrowserRouter>
+    )
+  }
+
   return (
     <BrowserRouter>
       <style>{hideScrollbar}</style>
@@ -139,7 +152,7 @@ export default function App() {
         justifyContent:  'center',
         padding:         '20px',
       }}>
-        {/* Phone frame */}
+        {/* Phone frame — desktop preview only */}
         <div style={{
           width:           '390px',
           height:          '844px',
@@ -162,8 +175,6 @@ export default function App() {
             borderRadius:    '0 0 20px 20px',
             zIndex:          999,
           }}/>
-
-          {/* App shell — handles routing + conditional nav bar */}
           <AppShell />
         </div>
       </div>

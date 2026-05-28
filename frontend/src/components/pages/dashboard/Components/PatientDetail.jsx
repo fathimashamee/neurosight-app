@@ -178,6 +178,7 @@ const PatientDetail = () => {
   const [enrollmentStatus, setEnrollmentStatus] = useState(null);
   const [enrolling, setEnrolling] = useState(false);
   const [enrollResult, setEnrollResult] = useState(null);
+  const [linkCopied, setLinkCopied] = useState(false);
   const [newCaretaker, setNewCaretaker] = useState({ name: '', phone: '', relation: '' });
   const [caretakerSaving, setCaretakerSaving] = useState(false);
   const [newPlanForm, setNewPlanForm] = useState({
@@ -876,7 +877,10 @@ const PatientDetail = () => {
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
                     <span style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', padding: '3px 10px', borderRadius: 20, background: '#f59e0b', color: '#fff' }}>Link Sent</span>
                     <button onClick={handleEnroll} disabled={enrolling}
-                      style={{ fontSize: 9, fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', cursor: 'pointer' }}>
+                      onMouseEnter={e => { e.currentTarget.style.background = '#dbeafe'; e.currentTarget.style.borderColor = '#93c5fd'; e.currentTarget.style.boxShadow = '0 1px 4px rgba(29,78,216,0.15)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = '#eff6ff'; e.currentTarget.style.borderColor = '#bfdbfe'; e.currentTarget.style.boxShadow = 'none'; }}
+                      style={{ fontSize: 9, fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', cursor: 'pointer', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 3 }}>
+                      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
                       Resend
                     </button>
                   </div>
@@ -907,14 +911,25 @@ const PatientDetail = () => {
                 )}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
                   <input readOnly value={enrollResult.link} style={{ flex: 1, fontSize: 10, padding: '4px 8px', border: '1px solid #bbf7d0', borderRadius: 6, background: '#fff', fontFamily: "'DM Mono',monospace", color: '#0f172a' }} />
-                  <button onClick={() => { navigator.clipboard.writeText(enrollResult.link); }}
-                    style={{ fontSize: 10, fontWeight: 700, padding: '4px 8px', borderRadius: 6, background: '#0d9488', color: '#fff', border: 'none', cursor: 'pointer', flexShrink: 0 }}>
-                    Copy
-                  </button>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, flexShrink: 0 }}>
+                    <button onClick={() => { navigator.clipboard.writeText(enrollResult.link); setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2000); }}
+                      onMouseEnter={e => { if (!linkCopied) { e.currentTarget.style.background = '#0f766e'; e.currentTarget.style.boxShadow = '0 2px 6px rgba(13,148,136,0.35)'; } }}
+                      onMouseLeave={e => { e.currentTarget.style.background = linkCopied ? '#15803d' : '#0d9488'; e.currentTarget.style.boxShadow = 'none'; }}
+                      style={{ fontSize: 10, fontWeight: 700, padding: '4px 10px', borderRadius: 6, background: linkCopied ? '#15803d' : '#0d9488', color: '#fff', border: 'none', cursor: 'pointer', transition: 'all 0.2s', minWidth: 52, display: 'flex', alignItems: 'center', gap: 3, justifyContent: 'center', width: '100%' }}>
+                      {linkCopied
+                        ? <><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Copied</>
+                        : 'Copy'}
+                    </button>
+                    <button onClick={() => setEnrollResult(null)}
+                      onMouseEnter={e => { e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.textDecoration = 'underline'; }}
+                      onMouseLeave={e => { e.currentTarget.style.color = '#94a3b8'; e.currentTarget.style.textDecoration = 'none'; }}
+                      style={{ fontSize: 9, fontWeight: 600, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', transition: 'color 0.15s', letterSpacing: '0.02em' }}>
+                      Dismiss
+                    </button>
+                  </div>
                 </div>
               </>
             )}
-            <button onClick={() => setEnrollResult(null)} style={{ alignSelf: 'flex-end', fontSize: 9, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', marginTop: 2 }}>Dismiss</button>
           </div>
         )}
 
