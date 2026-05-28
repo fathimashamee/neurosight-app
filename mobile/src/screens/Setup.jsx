@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import i18n from '../i18n'
 import { api } from '../api'
+import BackButton from './BackButton'
 
 function fmt24to12(t) {
   const [h, m] = t.split(':').map(Number)
@@ -121,11 +122,7 @@ export default function Setup() {
 
         {/* Top row: back button (settings mode) or logo badge (first-time) */}
         {isSettings ? (
-          <button
-            onClick={() => navigate('/home')}
-            style={{ background:'rgba(255,255,255,0.15)', border:'1px solid rgba(255,255,255,0.25)', borderRadius:10, color:'#fff', padding:'6px 12px', fontSize:12, cursor:'pointer', marginBottom:20, display:'inline-flex', alignItems:'center', gap:4, animation:'fadeUp 0.3s ease both' }}>
-            ← {t('setup.back')}
-          </button>
+          <BackButton variant="glass" to="/home" />
         ) : (
           <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:24, animation:'fadeUp 0.3s ease both' }}>
             <div style={{
