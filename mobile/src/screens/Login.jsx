@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { API_BASE } from '../api'
@@ -9,6 +9,17 @@ export default function Login() {
 
   const [role, setRole] = useState('patient')   // 'patient' | 'caretaker'
   const [patientId, setPatientId] = useState('')
+  const [enrolledName, setEnrolledName] = useState('')
+
+  useEffect(() => {
+    const prefill = localStorage.getItem('enrollment_prefill')
+    if (prefill) {
+      setPatientId(prefill)
+      setEnrolledName(localStorage.getItem('enrollment_name') || '')
+      localStorage.removeItem('enrollment_prefill')
+      localStorage.removeItem('enrollment_name')
+    }
+  }, [])
   const [phone, setPhone] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -136,6 +147,19 @@ export default function Login() {
 
       {/* Card */}
       <div style={{ flex:1, background:'#fff', borderRadius:'24px 24px 0 0', marginTop:-24, padding:'28px 24px', boxShadow:'0 -4px 20px rgba(0,0,0,0.06)', animation:'fadeUp 0.4s ease 0.1s both' }}>
+
+        {/* Enrollment welcome banner */}
+        {enrolledName ? (
+          <div style={{ background:'#f0fdfa', border:'1px solid #99f6e4', borderRadius:12, padding:'10px 14px', marginBottom:16, display:'flex', alignItems:'center', gap:10 }}>
+            <div style={{ width:28, height:28, borderRadius:8, background:'#0d9488', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round"><path d="M20 6L9 17l-5-5"/></svg>
+            </div>
+            <div>
+              <div style={{ fontSize:12, fontWeight:700, color:'#0f766e' }}>Welcome, {enrolledName}</div>
+              <div style={{ fontSize:11, color:'#0d9488', marginTop:1 }}>Your Hospital ID has been pre-filled. Just tap Sign In.</div>
+            </div>
+          </div>
+        ) : null}
 
         {/* Patient ID field */}
         <div style={{ marginBottom:16 }}>

@@ -23,9 +23,20 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str | None = None
     EMAILS_FROM_EMAIL: str = "noreply@neurosight.com"
 
+    # Enrollment
+    MOBILE_APP_URL: str = ""           # e.g. https://neurosight-mobile.vercel.app
+    TWILIO_ACCOUNT_SID: str | None = None
+    TWILIO_AUTH_TOKEN: str | None = None
+    TWILIO_PHONE_NUMBER: str | None = None
+
     model_config = SettingsConfigDict(env_file=str(ENV_FILE_PATH), extra="ignore")
 
     def model_post_init(self, __context):
+        # Render provides postgresql:// — SQLAlchemy needs postgresql+psycopg2://
+        if self.DATABASE_URL and self.DATABASE_URL.startswith('postgresql://'):
+            object.__setattr__(self, 'DATABASE_URL', self.DATABASE_URL.replace('postgresql://', 'postgresql+psycopg2://', 1))
+        elif self.DATABASE_URL and self.DATABASE_URL.startswith('postgres://'):
+            object.__setattr__(self, 'DATABASE_URL', self.DATABASE_URL.replace('postgres://', 'postgresql+psycopg2://', 1))
         if not self.DATABASE_URL or self.DATABASE_URL == DATABASE_URL_PLACEHOLDER:
             raise ValueError("DATABASE_URL must be provided via environment and cannot use the placeholder value.")
 

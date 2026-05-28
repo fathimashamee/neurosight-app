@@ -179,6 +179,7 @@ import AllStaffs from "./components/pages/dashboard/Components/AllStaffs";
 import AddNewStaff from "./components/pages/dashboard/Components/AddNewStaff";
 import PersonalizedSettings from "./components/pages/dashboard/Components/PersonalizedSettings";
 import PatientAlerts from "./components/pages/dashboard/Components/PatientAlerts";
+import PatientEnrollment from "./components/pages/dashboard/Components/PatientEnrollment";
 // import TreatmentPlan from "./components/pages/dashboard/Components/TreatmentPlan"; // hidden — integrated into patient records
 import ResultViewer from "./components/ResultViewer";
 import { clearAuth, fetchCurrentUser, getCurrentUser, getToken } from "./util";
@@ -300,8 +301,8 @@ export default function App() {
 
               <Route path="blockchain" element={<ComingSoon name="Blockchain Records"/>}/>
               <Route path="mobile-enrollment" element={
-                <RoleGuard user={user} allowedRoles={["Super Admin","Clinician","Assistant"]}>
-                  <ComingSoon name="Patient Mobile Enrollment"/>
+                <RoleGuard user={user} allowedRoles={["Super Admin","Clinician","Assistant","Doctor"]}>
+                  <PatientEnrollment />
                 </RoleGuard>
               }/>
               <Route path="patient-alerts" element={
