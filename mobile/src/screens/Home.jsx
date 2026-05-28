@@ -37,8 +37,16 @@ export default function Home() {
   const role        = localStorage.getItem('mobile_role') || 'patient'
   const isCaretaker = role === 'caretaker'
   const tc          = tumourPill(patient.tumour_type)
-  const setupDone   = !!localStorage.getItem(`setup_done_${patient.hospital_id}`)
-  const currentLang = localStorage.getItem('language') || 'en'
+  const setupDone    = !!localStorage.getItem(`setup_done_${patient.hospital_id}`)
+  const setupSkipped = !!localStorage.getItem(`setup_skipped_${patient.hospital_id}`)
+  const reminderTime = localStorage.getItem('reminder_time') || '20:00'
+  const currentLang  = localStorage.getItem('language') || 'en'
+
+  function fmtTime(t) {
+    const [h, m] = t.split(':').map(Number)
+    const p = h >= 12 ? 'PM' : 'AM'
+    return `${h % 12 || 12}:${m.toString().padStart(2, '0')} ${p}`
+  }
 
   const [checkin, setCheckin] = useState(() => {
     try { return JSON.parse(localStorage.getItem('mobile_latest_checkin') || 'null') } catch { return null }
@@ -185,53 +193,59 @@ export default function Home() {
 
         {/* Setup reminder banner */}
         {!setupDone && (
-          <div style={{ background: '#fffbeb', border: '1.5px solid #fde68a', borderRadius: 14, padding: '13px 14px', display: 'flex', alignItems: 'center', gap: 11, animation: 'fadeUp 0.4s ease both' }}>
-            <div style={{ width: 32, height: 32, borderRadius: 9, background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2.2" strokeLinecap="round">
-                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-                <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+          <div style={{ background: setupSkipped ? '#fff7ed' : '#fffbeb', border: `1.5px solid ${setupSkipped ? '#fed7aa' : '#fde68a'}`, borderRadius: 14, padding: '13px 14px', display: 'flex', alignItems: 'center', gap: 11, animation: 'fadeUp 0.4s ease both' }}>
+            <div style={{ width: 32, height: 32, borderRadius: 9, background: setupSkipped ? '#ffedd5' : '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={setupSkipped ? '#ea580c' : '#d97706'} strokeWidth="2.2" strokeLinecap="round">
+                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
               </svg>
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#92400e', marginBottom: 1 }}>{t('home.setupBanner')}</div>
-              <div style={{ fontSize: 11, color: '#b45309', lineHeight: 1.4 }}>{t('home.setupBannerSub')}</div>
+              {setupSkipped ? (
+                <>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#9a3412', marginBottom: 1 }}>Setup skipped</div>
+                  <div style={{ fontSize: 11, color: '#c2410c', lineHeight: 1.4 }}>
+                    Default check-in reminder: <strong>{fmtTime(reminderTime)}</strong> tap to customise
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#92400e', marginBottom: 1 }}>{t('home.setupBanner')}</div>
+                  <div style={{ fontSize: 11, color: '#b45309', lineHeight: 1.4 }}>{t('home.setupBannerSub')}</div>
+                </>
+              )}
             </div>
-            <button onClick={() => navigate('/setup')} style={{ background: '#d97706', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
-              {t('home.setupBannerBtn')}
+            <button onClick={() => navigate('/setup')} style={{ background: setupSkipped ? '#ea580c' : '#d97706', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
+              {setupSkipped ? 'Set up' : t('home.setupBannerBtn')}
             </button>
           </div>
         )}
 
         {/* Last check-in card */}
         <div style={{ background: '#fff', border: `1.5px solid ${ls ? ls.border : '#e2e8f0'}`, borderRadius: 14, padding: '13px 14px', animation: 'fadeUp 0.4s ease 0.08s both', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#94a3b8', marginBottom: 6 }}>
-                {t('home.lastCheckin')}
-              </div>
-              {checkin ? (
-                <>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                    <div style={{ width: 9, height: 9, borderRadius: '50%', background: ls.dot, flexShrink: 0 }} />
-                    <span style={{ fontSize: 14, fontWeight: 800, color: ls.color }}>{checkin.level}</span>
-                    <span style={{ fontSize: 11, color: '#94a3b8' }}>· {t('home.checkinScore')} {checkin.score}</span>
-                  </div>
-                  {checkin.created_at && (
-                    <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 3 }}>
-                      {new Date(checkin.created_at).toLocaleDateString()}
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div style={{ fontSize: 12, color: '#94a3b8', lineHeight: 1.5 }}>{t('home.noCheckin')}</div>
-              )}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#94a3b8', marginBottom: 6 }}>
+              {t('home.lastCheckin')}
             </div>
-            {checkin && (
-              <button
-                onClick={() => navigate('/result', { state: checkin })}
-                style={{ background: ls.bg, border: `1px solid ${ls.border}`, color: ls.color, borderRadius: 9, padding: '6px 11px', fontSize: 11, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
-                {t('home.viewDetails')}
-              </button>
+            {checkin ? (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                  <div style={{ width: 9, height: 9, borderRadius: '50%', background: ls.dot, flexShrink: 0 }} />
+                  <span style={{ fontSize: 14, fontWeight: 800, color: ls.color }}>{checkin.level}</span>
+                  <span style={{ fontSize: 11, color: '#94a3b8' }}>· {t('home.checkinScore')} {checkin.score}</span>
+                </div>
+                {checkin.created_at && (
+                  <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 3 }}>
+                    {new Date(checkin.created_at).toLocaleDateString()}
+                  </div>
+                )}
+                <button
+                  onClick={() => navigate('/result', { state: checkin })}
+                  style={{ background: ls.bg, border: `1px solid ${ls.border}`, color: ls.color, borderRadius: 9, padding: '6px 11px', fontSize: 11, fontWeight: 700, cursor: 'pointer', marginTop: 8 }}>
+                  {t('home.viewDetails')}
+                </button>
+              </>
+            ) : (
+              <div style={{ fontSize: 12, color: '#94a3b8', lineHeight: 1.5 }}>{t('home.noCheckin')}</div>
             )}
           </div>
         </div>
