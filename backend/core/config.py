@@ -32,13 +32,11 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=str(ENV_FILE_PATH), extra="ignore")
 
     def model_post_init(self, __context):
-        # Render provides postgresql:// — SQLAlchemy needs postgresql+psycopg2://
+        # Normalize postgresql:// / postgres:// → postgresql+psycopg2:// for SQLAlchemy
         if self.DATABASE_URL and self.DATABASE_URL.startswith('postgresql://'):
             object.__setattr__(self, 'DATABASE_URL', self.DATABASE_URL.replace('postgresql://', 'postgresql+psycopg2://', 1))
         elif self.DATABASE_URL and self.DATABASE_URL.startswith('postgres://'):
             object.__setattr__(self, 'DATABASE_URL', self.DATABASE_URL.replace('postgres://', 'postgresql+psycopg2://', 1))
-        if not self.DATABASE_URL or self.DATABASE_URL == DATABASE_URL_PLACEHOLDER:
-            raise ValueError("DATABASE_URL must be provided via environment and cannot use the placeholder value.")
 
 settings = Settings()
 
