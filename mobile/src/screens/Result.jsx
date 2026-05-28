@@ -119,7 +119,6 @@ export default function Result() {
               Saved {checkin.created_at ? new Date(checkin.created_at).toLocaleString() : 'just now'}.
             </div>
 
-            <button onClick={() => navigate('/home')} style={{ width:'100%', marginTop:8, padding:'14px 16px', border:'none', borderRadius:12, background:'#0d9488', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer' }}> Back to Home</button>
           </>
         )}
       </div>

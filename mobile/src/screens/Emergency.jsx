@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
+import BackButton from './BackButton'
 
 function EmergencyMarkIcon() {
   return (
@@ -206,14 +207,10 @@ export default function Emergency() {
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(180deg, #fff7f7 0%, #fff 28%, #fff 100%)', fontFamily: "'DM Sans', sans-serif", display: 'flex', flexDirection: 'column' }}>
       <div style={{ width: '100%', maxWidth: 560, margin: '0 auto', flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <div style={{ background: 'linear-gradient(135deg, #7f1d1d 0%, #b91c1c 52%, #dc2626 100%)', padding: '22px 20px 24px', color: '#fff', position: 'relative', overflow: 'hidden', borderBottomLeftRadius: 28, borderBottomRightRadius: 28, boxShadow: '0 18px 40px rgba(185,28,28,0.18)' }}>
+        <div style={{ background: 'linear-gradient(135deg, #7f1d1d 0%, #b91c1c 52%, #dc2626 100%)', padding: '52px 20px 24px', color: '#fff', position: 'relative', overflow: 'hidden', borderBottomLeftRadius: 28, borderBottomRightRadius: 28, boxShadow: '0 18px 40px rgba(185,28,28,0.18)' }}>
           <div style={{ position: 'absolute', top: -30, right: -20, width: 120, height: 120, borderRadius: '50%', background: 'rgba(255,255,255,0.08)' }} />
           <div style={{ position: 'absolute', bottom: -45, left: -30, width: 160, height: 160, borderRadius: '50%', background: 'rgba(255,255,255,0.05)' }} />
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-            <button onClick={() => navigate('/home')} style={{ background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.18)', borderRadius: 999, color: '#fff', padding: '8px 14px', fontSize: 13, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 800 }}>
-              ← Back
-            </button>
-          </div>
+          <BackButton variant="glass" to="/home" />
           <div style={{ marginTop: 18, display: 'grid', gridTemplateColumns: '72px 1fr', gap: 14, alignItems: 'center' }}>
             <div style={{ width: 62, height: 62, borderRadius: 22, background: 'rgba(255,255,255,0.14)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <EmergencyMarkIcon />
