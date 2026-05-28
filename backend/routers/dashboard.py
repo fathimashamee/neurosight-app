@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from backend.db.database import get_db
 from backend.models.user import User
 from backend.models.result import Result
+from backend.models.chat_message import ChatMessage
 from backend.core.security import get_current_active_user, require_admin
 # Database Models (Nirojini's addition)
 from backend.models.patient import Patient
@@ -184,3 +185,34 @@ def worklist(limit: int = 15, db: Session = Depends(get_db), current_user: User 
         })
 
     return rows
+
+
+@router.get("/patient-alerts")
+def patient_alerts(limit: int = 50, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
+    q = (
+        db.query(ChatMessage, Patient)
+        .join(Patient, ChatMessage.patient_id == Patient.id)
+        .filter(ChatMessage.emergency == True)
+    )
+
+    if current_user.role == "Clinician":
+        q = q.filter(Patient.assigned_doctor_id == current_user.id)
+
+    rows = q.order_by(ChatMessage.created_at.desc()).limit(limit).all()
+
+    alerts = []
+    for message, patient in rows:
+        alerts.append({
+            "id": message.id,
+            "patient_id": patient.id,
+            "hospital_id": patient.hospital_id,
+            "patient_name": patient.name,
+            "doctor_name": patient.clinician.name if patient.clinician else None,
+            "message": message.user_message,
+            "reply": message.bot_reply,
+            "topic": message.topic,
+            "created_at": message.created_at.isoformat() if message.created_at else None,
+            "emergency": bool(message.emergency),
+        })
+
+    return alerts

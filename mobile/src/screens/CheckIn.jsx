@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api } from '../api'
 
-const QUESTIONS = [
+const BRAIN_QUESTIONS = [
   {
     key: 'headache',
     title: 'Q1: Do you have a headache today?',
@@ -22,7 +22,7 @@ const QUESTIONS = [
       { label: 'Yes (brief)', points: 5 },
       { label: 'Yes (long)', points: 5 },
     ],
-    warning: 'If YES, go to hospital now.',
+    warning: 'If YES, seek urgent help now.',
   },
   {
     key: 'energy',
@@ -64,7 +64,132 @@ const QUESTIONS = [
       { label: 'Much worse', points: 3 },
     ],
   },
+  {
+    key: 'sleep',
+    title: 'Q7: How did you sleep last night?',
+    options: [
+      { label: 'Well', points: 0 },
+      { label: 'Okay', points: 1 },
+      { label: 'Poor', points: 2 },
+      { label: 'Very little', points: 3 },
+    ],
+  },
+  {
+    key: 'appetite',
+    title: 'Q8: How is your appetite today?',
+    options: [
+      { label: 'Normal', points: 0 },
+      { label: 'Slightly low', points: 1 },
+      { label: 'Very low', points: 2 },
+      { label: 'Could not eat', points: 3 },
+    ],
+  },
+  
 ]
+
+const NORMAL_QUESTIONS = [
+  {
+    key: 'headache',
+    title: 'Q1: Do you have a headache today?',
+    options: [
+      { label: 'No headache', points: 0 },
+      { label: 'Mild (a little)', points: 1 },
+      { label: 'Moderate (painful)', points: 2 },
+      { label: 'Severe (very bad)', points: 3 },
+    ],
+  },
+  {
+    key: 'seizure',
+    title: 'Q2: Did you have a seizure today?',
+    options: [
+      { label: 'No', points: 0 },
+      { label: 'Yes (brief)', points: 5 },
+      { label: 'Yes (long)', points: 5 },
+    ],
+    warning: 'If YES, seek urgent help now.',
+  },
+  {
+    key: 'energy',
+    title: 'Q3: How is your energy today?',
+    options: [
+      { label: 'Normal', points: 0 },
+      { label: 'A bit tired', points: 1 },
+      { label: 'Very tired', points: 2 },
+      { label: 'Cannot get up', points: 3 },
+    ],
+  },
+  {
+    key: 'medication',
+    title: 'Q4: Did you take your medication?',
+    options: [
+      { label: 'Yes (all doses)', points: 0 },
+      { label: 'Missed one dose', points: 1 },
+      { label: 'Missed all doses', points: 2 },
+      { label: 'No medication today', points: 0 },
+    ],
+  },
+  {
+    key: 'overall',
+    title: 'Q5: How are you feeling overall?',
+    options: [
+      { label: 'Good', points: 0 },
+      { label: 'Same as usual', points: 1 },
+      { label: 'Worse than yesterday', points: 2 },
+      { label: 'Much worse', points: 3 },
+    ],
+  },
+  {
+    key: 'sleep',
+    title: 'Q6: How did you sleep last night?',
+    options: [
+      { label: 'Well', points: 0 },
+      { label: 'Okay', points: 1 },
+      { label: 'Poor', points: 2 },
+      { label: 'Very little', points: 3 },
+    ],
+  },
+  {
+    key: 'appetite',
+    title: 'Q7: How is your appetite today?',
+    options: [
+      { label: 'Normal', points: 0 },
+      { label: 'Slightly low', points: 1 },
+      { label: 'Very low', points: 2 },
+      { label: 'Could not eat', points: 3 },
+    ],
+  },
+  
+]
+
+const URGENT_FOLLOW_UPS = {
+  headache: {
+    key: 'headache_followup',
+    title: 'Follow-up: have you told a caregiver or doctor about the severe headache?',
+    options: [
+      { label: 'Yes, already informed', points: 0 },
+      { label: 'Not yet', points: 0 },
+    ],
+    warning: 'Severe headache needs prompt medical attention.',
+  },
+  seizure: {
+    key: 'seizure_followup',
+    title: 'Follow-up: have you contacted urgent help for the seizure?',
+    options: [
+      { label: 'Yes, already contacted', points: 0 },
+      { label: 'Not yet', points: 0 },
+    ],
+    warning: 'A seizure is treated as a critical red flag.',
+  },
+  nausea: {
+    key: 'vomit_followup',
+    title: 'Follow-up: are you still able to keep fluids down?',
+    options: [
+      { label: 'Yes', points: 0 },
+      { label: 'No', points: 0 },
+    ],
+    warning: 'Repeated vomiting can cause dehydration and needs review.',
+  },
+}
 
 function monitoringPlan(tumourType) {
   const value = (tumourType || '').toLowerCase()
@@ -76,8 +201,49 @@ function monitoringPlan(tumourType) {
 }
 
 function scoreAnswer(questionKey, value) {
-  const question = QUESTIONS.find(q => q.key === questionKey)
+  const all = [...BRAIN_QUESTIONS, ...NORMAL_QUESTIONS]
+  const question = all.find(q => q.key === questionKey)
   return question?.options.find(option => option.label === value)?.points ?? 0
+}
+
+function resolveUserType(patient, storedUserType) {
+  if (storedUserType === 'normal_user' || storedUserType === 'brain_tumor_patient') {
+    return storedUserType
+  }
+
+  const tumourType = (patient?.tumour_type || '').toLowerCase()
+  if (tumourType.includes('no tumor') || tumourType.includes('no tumour')) {
+    return 'normal_user'
+  }
+
+  return 'brain_tumor_patient'
+}
+
+function draftStorageKey(patient, userType) {
+  return `checkin_saved_${patient.hospital_id || patient.id || 'anon'}_${userType}`
+}
+
+function buildQuestionFlow(userType, answers) {
+  const base = userType === 'normal_user' ? NORMAL_QUESTIONS : BRAIN_QUESTIONS
+  const flow = []
+
+  for (const question of base) {
+    flow.push(question)
+
+    if (question.key === 'headache' && answers.headache === 'Severe (very bad)') {
+      flow.push(URGENT_FOLLOW_UPS.headache)
+    }
+
+    if (question.key === 'seizure' && answers.seizure && answers.seizure !== 'No') {
+      flow.push(URGENT_FOLLOW_UPS.seizure)
+    }
+
+    if (question.key === 'nausea' && answers.nausea === 'Vomited many times') {
+      flow.push(URGENT_FOLLOW_UPS.nausea)
+    }
+  }
+
+  return flow
 }
 
 export default function CheckIn() {
@@ -85,13 +251,22 @@ export default function CheckIn() {
   const { t } = useTranslation()
   const patient = JSON.parse(localStorage.getItem('mobile_patient') || '{}')
   const role = localStorage.getItem('mobile_role') || 'patient'
+  const location = useLocation()
+  const forcedUserType = location?.state?.forceUserType
+  const userType = forcedUserType || resolveUserType(patient, localStorage.getItem('mobile_user_type'))
+  const [showForcedBanner, setShowForcedBanner] = useState(false)
+  const tumourGrade = localStorage.getItem('mobile_tumour_grade') || patient.tumour_type || ''
   const reminder = useMemo(() => monitoringPlan(patient.tumour_type), [patient.tumour_type])
+  const draftKey = draftStorageKey(patient, userType)
 
   const [step, setStep] = useState(0)
-  const [answers, setAnswers] = useState({ headache: '', seizure: '', energy: '', nausea: '', medication: '', overall: '', note: '' })
+  const [answers, setAnswers] = useState({ headache: '', headache_followup: '', seizure: '', seizure_followup: '', energy: '', nausea: '', vomit_followup: '', medication: '', overall: '', sleep: '', appetite: '', note: '' })
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [notifyLoading, setNotifyLoading] = useState(false)
+  const [notifyResult, setNotifyResult] = useState('')
   const [latest, setLatest] = useState(null)
+  const QUESTIONS = useMemo(() => buildQuestionFlow(userType, answers), [userType, answers])
 
   useEffect(() => {
     if (!patient.id) {
@@ -109,19 +284,91 @@ export default function CheckIn() {
     return () => { mounted = false }
   }, [navigate, patient.id])
 
-  const current = QUESTIONS[step]
-  const isLast = step === QUESTIONS.length - 1
+  useEffect(() => {
+    if (forcedUserType) {
+      setShowForcedBanner(true)
+      const t = setTimeout(() => setShowForcedBanner(false), 900)
+      return () => clearTimeout(t)
+    }
+  }, [forcedUserType])
+
+  // Load any locally-saved in-progress check-in for this user
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(draftKey)
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (parsed.answers) setAnswers(prev => ({ ...prev, ...parsed.answers }))
+        if (typeof parsed.primaryStep === 'number') setStep(parsed.primaryStep)
+      }
+    } catch (e) {}
+  }, [draftKey])
+
+  // Autosave answers locally on every change
+  useEffect(() => {
+    try {
+      localStorage.setItem(draftKey, JSON.stringify({ primaryStep: step, answers, userType, tumourGrade }))
+    } catch (e) {}
+  }, [answers, step, userType, tumourGrade, draftKey])
+
+  // Ensure `step` stays within bounds when question set changes
+  useEffect(() => {
+    if (step >= QUESTIONS.length) {
+      setStep(Math.max(0, QUESTIONS.length - 1))
+    }
+  }, [QUESTIONS.length, step])
+
+  const safeStep = Math.min(step, Math.max(0, QUESTIONS.length - 1))
+  const current = QUESTIONS[safeStep]
+  const isLast = safeStep === QUESTIONS.length - 1
   const canProceed = !!answers[current?.key]
 
   const totalScore = useMemo(() => {
     return QUESTIONS.reduce((sum, question) => sum + scoreAnswer(question.key, answers[question.key]), 0)
-  }, [answers])
+  }, [answers, QUESTIONS])
 
   const seizureSelected = answers.seizure && answers.seizure !== 'No'
+  const severeHeadacheSelected = answers.headache === 'Severe (very bad)'
+  const repeatedVomitingSelected = answers.nausea === 'Vomited many times'
+  const emergencyActionStyle = {
+    minHeight: 46,
+    padding: '10px 12px',
+    borderRadius: 10,
+    fontSize: 14,
+    background: '#0f766e',
+    color: '#fff',
+    fontWeight: 800,
+    border: 'none',
+    cursor: 'pointer',
+    lineHeight: 1.15,
+    boxSizing: 'border-box',
+  }
+  const emergencyOutlineStyle = {
+    ...emergencyActionStyle,
+    background: '#fff',
+    color: '#b91c1c',
+    border: '1px solid #fecaca',
+  }
+  const emergencyDialStyle = {
+    ...emergencyActionStyle,
+    background: '#ef4444',
+  }
+  const emergencyNotifyStyle = {
+    ...emergencyActionStyle,
+    background: '#f97316',
+  }
+  const emergencySubmitStyle = {
+    ...emergencyActionStyle,
+    background: '#0f766e',
+  }
+  const emergencyComboStyle = {
+    ...emergencyActionStyle,
+    background: '#b91c1c',
+  }
 
-  function choose(optionLabel) {
+  function choose(optionLabel, key = current.key) {
     setError('')
-    setAnswers(prev => ({ ...prev, [current.key]: optionLabel }))
+    setAnswers(prev => ({ ...prev, [key]: optionLabel }))
   }
 
   function next() {
@@ -138,6 +385,16 @@ export default function CheckIn() {
     setError('')
     setSubmitting(true)
     try {
+      const branchNotes = [
+        severeHeadacheSelected ? `Severe headache follow-up: ${answers.headache_followup || 'not answered'}` : null,
+        seizureSelected ? `Seizure follow-up: ${answers.seizure_followup || 'not answered'}` : null,
+        repeatedVomitingSelected ? `Vomiting follow-up: ${answers.vomit_followup || 'not answered'}` : null,
+      ].filter(Boolean)
+
+      // Prepare note and truncate to 140 chars to match backend compacting behavior
+      let note = [answers.note, ...branchNotes].filter(Boolean).join(' | ') || null
+      if (note && note.length > 140) note = note.slice(0, 137).trim() + '…'
+
       const payload = {
         headache: answers.headache,
         seizure: answers.seizure,
@@ -145,13 +402,23 @@ export default function CheckIn() {
         nausea: answers.nausea,
         medication: answers.medication,
         overall: answers.overall,
-        note: answers.note,
+        // send null for optional unanswered fields so backend treats them as empty
+        sleep: answers.sleep || null,
+        appetite: answers.appetite || null,
+        note: note,
         trigger_source: 'Patient taps "Daily Check-in"',
       }
       const saved = await api('/mobile/checkins', { method: 'POST', body: payload })
       localStorage.setItem('mobile_latest_checkin', JSON.stringify(saved))
       navigate('/result', { state: saved })
     } catch (err) {
+      // Handle authentication errors specifically
+      if (err && (err.status === 401 || (err.message || '').toLowerCase().includes('token') || (err.message || '').toLowerCase().includes('unauthorized'))) {
+        localStorage.removeItem('mobile_token')
+        setError('Authentication error. Please sign in again.')
+        navigate('/login', { replace: true })
+        return
+      }
       setError(err.message || 'Unable to submit check-in')
     } finally {
       setSubmitting(false)
@@ -166,7 +433,7 @@ export default function CheckIn() {
         .ci-option:active { transform: scale(0.99); }
       `}</style>
 
-      <div style={{ background:'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)', padding:'36px 24px 28px', position:'relative', overflow:'hidden' }}>
+        <div style={{ background:'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)', padding:'48px 20px 28px', position:'relative', overflow:'hidden' }}>
         <div style={{ position:'absolute', top:-34, right:-28, width:140, height:140, borderRadius:'50%', background:'rgba(255,255,255,0.08)', pointerEvents:'none' }} />
 
         <div style={{ animation:'fadeUp 0.35s ease both' }}>
@@ -175,61 +442,30 @@ export default function CheckIn() {
           <div style={{ fontSize:13, color:'rgba(255,255,255,0.74)', marginTop:6 }}>Start anytime with Daily Check-in.</div>
         </div>
 
-          
+        {/* top-right emergency shortcut removed per request */}
+
       </div>
 
-      <div style={{ display:'flex', justifyContent:'center' }}>
-        <div style={{ width:'92%', maxWidth:640, marginTop:0, background:'#fff', borderRadius:12, padding:'12px 14px', boxShadow:'0 6px 20px rgba(2,6,23,0.08)' }}>
-          <div style={{ display:'flex', gap:1, alignItems:'center', justifyContent:'space-between' }}>
-            <div style={{ flex:1, minWidth:100 }}>
-              <div style={{ fontSize:13, color:'#64748b' }}>Hospital ID</div>
-              <div style={{ fontSize:14, fontWeight:800, fontFamily:"'DM Mono', monospace", marginTop:6 }}>{patient.hospital_id || '—'}</div>
-            </div>
+      
 
-            <div style={{ width:1, height:36, background:'rgb(65, 68, 73)', margin:'0 8px' }} />
-
-            <div style={{ flex:1, minWidth:120 }}>
-              <div style={{ fontSize:13, color:'#64748b' }}>Plan</div>
-              <div style={{ fontSize:14, fontWeight:800, marginTop:6, fontFamily:"'DM Mono', monospace"}}>{reminder.label === 'Reminder not configured' ? 'Plan not set' : reminder.label}</div>
-            </div>
-
-            <div style={{ width:1, height:36, background:'rgb(65, 68, 73)', margin:'0 8px' }} />
-
-            <div style={{ flex:1, minWidth:100 }}>
-              <div style={{ fontSize:13, color:'#64748b' }}>Role</div>
-              <div style={{ fontSize:14, fontWeight:800, marginTop:6 , fontFamily:"'DM Mono', monospace" }}>{role === 'caretaker' ? 'Caretaker' : 'Patient'}</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div style={{ flex:1, background:'#fff', borderRadius:'24px 24px 0 0', marginTop:6, padding:'16px 20px 24px', boxShadow:'0 -4px 20px rgba(0,0,0,0.06)' }}>
+      <div style={{ flex:1, background:'#fff', borderRadius:'24px 24px 0 0', marginTop:6, padding:'16px 20px 82px', boxShadow:'0 -4px 20px rgba(0,0,0,0.06)' }}>
+        {showForcedBanner && (
+          <div style={{ marginBottom:10, padding:'10px 12px', borderRadius:12, background:'#ecfeff', border:'1px solid #bbf7d0', color:'#064e3b', fontWeight:700 }}>Opening brain‑tumour check‑in…</div>
+        )}
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
           <div>
             <div style={{ fontSize:11, fontWeight:800, textTransform:'uppercase', letterSpacing:'0.12em', color:'#94a3b8' }}>Daily Health Check-in</div>
-            <div style={{ fontSize:13, color:'#64748b', marginTop:4 }}>{new Date().toLocaleDateString(undefined, { weekday:'long', day:'numeric', month:'long', year:'numeric' })}</div>
           </div>
-          <div style={{ fontSize:12, color:'#0f766e', fontWeight:700 }}>{step + 1} of {QUESTIONS.length}</div>
+          <div style={{ fontSize:12, color:'#0f766e', fontWeight:700 }}>{safeStep + 1} of {QUESTIONS.length}</div>
         </div>
 
-        <div style={{ height:10, borderRadius:999, background:'#e2e8f0', overflow:'hidden', marginBottom:18 }}>
-          <div style={{ width:`${((step + 1) / QUESTIONS.length) * 100}%`, height:'100%', background:'linear-gradient(90deg, #0d9488, #2dd4bf)', borderRadius:999 }} />
+        <div style={{ height:10, borderRadius:999, background:'#e2e8f0', overflow:'hidden', marginBottom:14 }}>
+          <div style={{ width:`${((safeStep + 1) / QUESTIONS.length) * 100}%`, height:'100%', background:'linear-gradient(90deg, #0d9488, #2dd4bf)', borderRadius:999 }} />
         </div>
 
-        <div style={{ border:'1px solid #dbeafe', background:'#eff6ff', borderRadius:16, padding:'14px 16px', marginBottom:18 }}>
-          <div style={{ fontSize:11, fontWeight:800, letterSpacing:'0.1em', textTransform:'uppercase', color:'#1d4ed8', marginBottom:8 }}>How it works</div>
-          <div style={{ fontSize:13, color:'#1e3a8a', lineHeight:1.7 }}>
-            You can complete this check in when the app reminds you or whenever you want to record how you are feeling today.
-          </div>
-          <div style={{ marginTop:12, borderRadius:12, background:'#fff', border:'1px solid #bfdbfe', padding:'10px 12px' }}>
-            <div style={{ fontSize:11, fontWeight:800, textTransform:'uppercase', letterSpacing:'0.08em', color:'#1d4ed8', marginBottom:4 }}>What to expect</div>
-            <div style={{ fontSize:13, color:'#1e3a8a', lineHeight:1.6 }}>
-              Answer a few simple questions, send the form, and see a clear result right away.
-            </div>
-          </div>
-        </div>
+              
 
-        <div style={{ marginBottom:16 }}>
+              <div style={{ marginBottom:16 }}>
           <div style={{ fontSize:16, fontWeight:800, color:'#0f172a', marginBottom:8 }}>{current.title}</div>
           <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
             {current.options.map(option => {
@@ -257,7 +493,27 @@ export default function CheckIn() {
               ⚠ {current.warning}
             </div>
           )}
+
+          {current.key === 'headache_followup' && severeHeadacheSelected && (
+            <div style={{ marginTop:10, padding:'10px 12px', borderRadius:12, background:'#fef2f2', border:'1px solid #fecaca', color:'#b91c1c', fontSize:12, fontWeight:700 }}>
+              This follow-up only appears because you selected severe headache.
+            </div>
+          )}
+
+          {current.key === 'seizure_followup' && seizureSelected && (
+            <div style={{ marginTop:10, padding:'10px 12px', borderRadius:12, background:'#fef2f2', border:'1px solid #fecaca', color:'#b91c1c', fontSize:12, fontWeight:700 }}>
+              This follow-up only appears because you reported a seizure.
+            </div>
+          )}
+
+          {current.key === 'vomit_followup' && repeatedVomitingSelected && (
+            <div style={{ marginTop:10, padding:'10px 12px', borderRadius:12, background:'#fef2f2', border:'1px solid #fecaca', color:'#b91c1c', fontSize:12, fontWeight:700 }}>
+              This follow-up only appears because you selected repeated vomiting.
+            </div>
+          )}
         </div>
+
+        
 
         {isLast && (
           <div style={{ marginBottom:18 }}>
@@ -278,6 +534,51 @@ export default function CheckIn() {
           </div>
         )}
 
+        {(seizureSelected || severeHeadacheSelected || repeatedVomitingSelected) && (
+          <div style={{ marginBottom:14, padding:14, borderRadius:12, background:'#fff1f2', border:'1px solid #fecaca' }}>
+            <div style={{ fontSize:15, fontWeight:900, color:'#7f1d1d', marginBottom:8 }}>Emergency escalation</div>
+            <div style={{ fontSize:13, color:'#7f1d1d', marginBottom:10 }}>This submission contains red‑flag symptoms. You can call emergency services or notify your clinician immediately.</div>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(2, minmax(0, 1fr))', gap:8, marginBottom:6 }}>
+              <a href="tel:1990" onClick={(e) => { try { window.location.href = 'tel:1990' } catch(_){} }} style={{ ...emergencyDialStyle, display:'flex', alignItems:'center', justifyContent:'center', textAlign:'center', textDecoration:'none' }}>Call Emergency</a>
+              <button disabled={notifyLoading} onClick={async () => {
+                setNotifyLoading(true)
+                setNotifyResult('')
+                try {
+                  const msg = `Urgent: ${patient.name || patient.hospital_id || 'patient'} reports red‑flag symptoms via Daily Check‑in.`
+                  await api('/mobile/notify', { method: 'POST', body: { message: msg } })
+                  setNotifyResult('Clinician notified')
+                } catch (e) {
+                  setNotifyResult('Unable to notify clinician')
+                } finally {
+                  setNotifyLoading(false)
+                }
+              }} style={emergencyNotifyStyle}>{notifyLoading ? 'Notifying…' : 'Notify Clinician'}</button>
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(2, minmax(0, 1fr))', gap:8 }}>
+              <button onClick={() => navigate('/emergency')} style={emergencyOutlineStyle}>Open SOS</button>
+              <button disabled={submitting} onClick={async () => {
+                try {
+                  await submit()
+                } catch (e) {}
+              }} style={emergencySubmitStyle}>Submit Check‑in</button>
+              <button disabled={notifyLoading || submitting} onClick={async () => {
+                setNotifyLoading(true)
+                setNotifyResult('')
+                try {
+                  const msg = `Urgent: ${patient.name || patient.hospital_id || 'patient'} reports red‑flag symptoms via Daily Check‑in.`
+                  await api('/mobile/notify', { method: 'POST', body: { message: msg } })
+                  await submit()
+                } catch (e) {
+                  setNotifyResult('Failed to notify and submit')
+                } finally {
+                  setNotifyLoading(false)
+                }
+              }} style={{ ...emergencyComboStyle, gridColumn:'1 / -1' }}>Notify & Submit</button>
+            </div>
+            {notifyResult && <div style={{ marginTop:10, fontSize:13, color:'#334155' }}>{notifyResult}</div>}
+          </div>
+        )}
+
         {error && <div style={{ marginBottom:14, padding:'10px 12px', borderRadius:12, background:'#fef2f2', border:'1px solid #fecaca', color:'#b91c1c', fontSize:13 }}>{error}</div>}
 
         <div style={{ display:'flex', gap:10, marginTop:6 }}>
@@ -287,33 +588,6 @@ export default function CheckIn() {
           ) : (
             <button onClick={submit} disabled={!canProceed || submitting} style={{ flex:1, padding:'14px 12px', borderRadius:12, border:'none', background: canProceed ? '#0d9488' : '#d1d5db', color:'#fff', fontWeight:800, cursor: canProceed ? 'pointer' : 'not-allowed' }}>{submitting ? 'Submitting…' : 'SUBMIT CHECK-IN'}</button>
           )}
-        </div>
-
-        <div style={{ marginTop:18, padding:'14px 16px', borderRadius:16, background:'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', border:'1px solid #e2e8f0' }}>
-          <div style={{ fontSize:11, fontWeight:800, letterSpacing:'0.1em', textTransform:'uppercase', color:'#94a3b8', marginBottom:8 }}>How to read your result</div>
-          <div style={{ display:'grid', gap:10 }}>
-            <div style={{ padding:'10px 12px', borderRadius:12, background:'#f0fdf4', border:'1px solid #bbf7d0' }}>
-              <div style={{ fontSize:13, fontWeight:800, color:'#166534', marginBottom:2 }}>Green</div>
-              <div style={{ fontSize:13, color:'#334155', lineHeight:1.6 }}>A calm day. Keep going with your usual routine.</div>
-            </div>
-            <div style={{ padding:'10px 12px', borderRadius:12, background:'#fffbeb', border:'1px solid #fde68a' }}>
-              <div style={{ fontSize:13, fontWeight:800, color:'#92400e', marginBottom:2 }}>Amber</div>
-              <div style={{ fontSize:13, color:'#334155', lineHeight:1.6 }}>Something feels a little different. Keep an eye on it.</div>
-            </div>
-            <div style={{ padding:'10px 12px', borderRadius:12, background:'#fff7ed', border:'1px solid #fed7aa' }}>
-              <div style={{ fontSize:13, fontWeight:800, color:'#c2410c', marginBottom:2 }}>Red</div>
-              <div style={{ fontSize:13, color:'#334155', lineHeight:1.6 }}>Your care team should hear from you soon.</div>
-            </div>
-            <div style={{ padding:'10px 12px', borderRadius:12, background:'#fef2f2', border:'1px solid #fecaca' }}>
-              <div style={{ fontSize:13, fontWeight:800, color:'#b91c1c', marginBottom:2 }}>Critical</div>
-              <div style={{ fontSize:13, color:'#334155', lineHeight:1.6 }}>Please get urgent medical help right away.</div>
-            </div>
-            <div style={{ padding:'10px 12px', borderRadius:12, background:'#fef2f2', border:'1px solid #fecaca' }}>
-              <div style={{ fontSize:13, fontWeight:800, color:'#b91c1c', marginBottom:2 }}>Seizure reported</div>
-              <div style={{ fontSize:13, color:'#334155', lineHeight:1.6 }}>This is always treated as Critical.</div>
-            </div>
-          </div>
-          <div style={{ marginTop:10, fontSize:12, color:'#0f766e', fontWeight:700 }}>Today’s score: {totalScore}</div>
         </div>
 
         {latest && (

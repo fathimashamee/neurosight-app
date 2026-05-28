@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api } from '../api'
+import BackButton from './BackButton'
 
 const HISTORY_KEY = 'mobile_chat_history'
 
@@ -139,7 +140,7 @@ export default function Chat() {
   }
 
   return (
-    <div style={{ height:'100svh', background:'#f1f5f9', fontFamily:"'DM Sans',sans-serif", display:'flex', flexDirection:'column', overflow:'hidden' }}>
+    <div style={{ height:'100%', background:'#f1f5f9', fontFamily:"'DM Sans',sans-serif", display:'flex', flexDirection:'column', overflow:'hidden' }}>
 
       <style>{`
         @keyframes dotBounce {
@@ -148,7 +149,13 @@ export default function Chat() {
         }
         @keyframes fadeUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
         @keyframes spin { to { transform:rotate(360deg); } }
-        .quick-btn:active { transform:scale(0.95); }
+        .msg-list { scrollbar-width:none; -ms-overflow-style:none; }
+        .msg-list::-webkit-scrollbar { display:none; }
+        .quick-scroll { scrollbar-width:none; -ms-overflow-style:none; }
+        .quick-scroll::-webkit-scrollbar { display:none; }
+        .quick-btn { transition:transform 0.12s, background 0.12s, box-shadow 0.12s !important; }
+        .quick-btn:active { transform:scale(0.95) !important; }
+        .quick-btn:hover { background:#f0fdfa !important; border-color:#99f6e4 !important; color:#0f766e !important; }
       `}</style>
 
       {/* ── Header ─────────────────────────────────────────── */}
@@ -158,7 +165,7 @@ export default function Chat() {
 
         <div style={{ position:'relative', zIndex:1, display:'flex', alignItems:'center', gap:12 }}>
           {/* Back */}
-          <button onClick={() => navigate('/home')} style={{ width:38, height:38, borderRadius:11, background:'rgba(255,255,255,0.15)', border:'1px solid rgba(255,255,255,0.25)', color:'#fff', fontSize:20, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>‹</button>
+          <BackButton variant="glass" to="/home" />
 
           {/* Bot icon */}
           <div style={{ width:44, height:44, borderRadius:13, background:'rgba(255,255,255,0.18)', border:'1px solid rgba(255,255,255,0.25)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, backdropFilter:'blur(8px)' }}>
@@ -187,12 +194,12 @@ export default function Chat() {
       </div>
 
       {/* ── Quick questions ─────────────────────────────────── */}
-      <div style={{ padding:'10px 16px 10px', background:'#fff', borderBottom:'1px solid #e2e8f0', flexShrink:0 }}>
-        <div style={{ fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.12em', color:'#94a3b8', marginBottom:8 }}>{t('chat.quickTitle')}</div>
-        <div style={{ display:'flex', gap:8, overflowX:'auto', paddingBottom:2 }}>
+      <div style={{ padding:'10px 16px 8px', background:'#fff', borderBottom:'1px solid #e8edf2', flexShrink:0 }}>
+        <div style={{ fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.13em', color:'#b0bacb', marginBottom:7 }}>{t('chat.quickTitle')}</div>
+        <div className="quick-scroll" style={{ display:'flex', gap:7, overflowX:'auto', paddingBottom:2 }}>
           {['chat.quick1','chat.quick2','chat.quick3','chat.quick4'].map(key => (
             <button key={key} className="quick-btn" onClick={() => sendMessage(t(key))} disabled={sending}
-              style={{ padding:'8px 14px', borderRadius:22, border:'1px solid #e2e8f0', background:'#f8fafc', cursor:sending?'not-allowed':'pointer', fontSize:12, color:'#334155', fontWeight:600, whiteSpace:'nowrap', flexShrink:0, opacity:sending?0.5:1, transition:'transform 0.12s' }}>
+              style={{ padding:'7px 13px', borderRadius:20, border:'1.5px solid #e2e8f0', background:'#f8fafc', cursor:sending?'not-allowed':'pointer', fontSize:12, color:'#475569', fontWeight:600, whiteSpace:'nowrap', flexShrink:0, opacity:sending?0.45:1, fontFamily:"'DM Sans',sans-serif" }}>
               {t(key)}
             </button>
           ))}
@@ -200,7 +207,7 @@ export default function Chat() {
       </div>
 
       {/* ── Messages ────────────────────────────────────────── */}
-      <div style={{ flex:1, overflowY:'auto', padding:'18px 16px 10px', display:'flex', flexDirection:'column', gap:18 }}>
+      <div className="msg-list" style={{ flex:1, overflowY:'auto', padding:'18px 16px 10px', display:'flex', flexDirection:'column', gap:18 }}>
 
         {loadingHistory ? (
           <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center' }}>
@@ -245,16 +252,17 @@ export default function Chat() {
 
                   {/* Message bubble */}
                   <div style={{
-                    background: isEmergency ? '#fff5f5' : '#fff',
-                    color:      isEmergency ? '#7f1d1d' : '#1e293b',
-                    padding:    '13px 17px',
+                    background:   isEmergency ? '#fff5f5' : '#fff',
+                    color:        isEmergency ? '#7f1d1d' : '#1e293b',
+                    padding:      '13px 17px',
                     borderRadius: 14,
-                    fontSize:   15,
-                    lineHeight: 1.7,
-                    textAlign:  'left',
-                    border:     `1.5px solid ${isEmergency ? '#fecaca' : '#e8edf2'}`,
-                    boxShadow:  isEmergency ? '0 2px 12px rgba(220,38,38,0.09)' : '0 1px 5px rgba(0,0,0,0.05)',
-                    wordBreak:  'break-word',
+                    fontSize:     15,
+                    lineHeight:   1.7,
+                    textAlign:    'left',
+                    border:       `1.5px solid ${isEmergency ? '#fecaca' : '#e8edf2'}`,
+                    boxShadow:    isEmergency ? '0 2px 12px rgba(220,38,38,0.09)' : '0 1px 5px rgba(0,0,0,0.05)',
+                    wordBreak:    'break-word',
+                    whiteSpace:   'pre-line',
                   }}>
                     {m.text}
                   </div>

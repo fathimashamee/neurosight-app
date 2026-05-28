@@ -305,6 +305,8 @@ class CheckInCreateRequest(BaseModel):
     nausea: str
     medication: str
     overall: str
+    sleep: str | None = None
+    appetite: str | None = None
     note: str | None = None
     trigger_source: str | None = None
 
@@ -323,6 +325,8 @@ class CheckInResponse(BaseModel):
     nausea: str
     medication: str
     overall: str
+    sleep: str | None = None
+    appetite: str | None = None
     note: str | None = None
     score: int
     level: str
@@ -356,13 +360,22 @@ class ChatResponse(BaseModel):
     patient_summary: str
 
 
+class NotifyRequest(BaseModel):
+    message: str
+
+
 # ── endpoints ────────────────────────────────────────────────────────────────
 
 @router.post("/login")
 def patient_login(body: PatientLoginRequest, db: Session = Depends(get_db)):
-    patient = db.query(Patient).filter(
-        Patient.hospital_id == body.hospital_id.strip().upper()
-    ).first()
+    lookup = body.hospital_id.strip()
+    normalized = lookup.upper()
+
+    query = db.query(Patient).filter(Patient.hospital_id == normalized)
+    if lookup.isdigit():
+        query = query.union_all(db.query(Patient).filter(Patient.id == int(lookup)))
+
+    patient = query.first()
     if not patient:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Patient not found")
 
@@ -426,6 +439,8 @@ def latest_checkin(
         nausea=latest.nausea,
         medication=latest.medication,
         overall=latest.overall,
+        sleep=latest.sleep,
+        appetite=latest.appetite,
         note=latest.note,
         score=latest.score,
         level=latest.level,
@@ -471,14 +486,14 @@ def submit_checkin(
     scoring = {
         "headache": {
             "No headache": 0,
-            "Mild — a little": 1,
-            "Moderate — painful": 2,
-            "Severe — very bad": 3,
+            "Mild (a little)": 1,
+            "Moderate (painful)": 2,
+            "Severe (very bad)": 3,
         },
         "seizure": {
             "No": 0,
-            "Yes — brief": 5,
-            "Yes — long time": 5,
+            "Yes (brief)": 5,
+            "Yes (long)": 5,
         },
         "energy": {
             "Normal": 0,
@@ -493,7 +508,7 @@ def submit_checkin(
             "Vomited many times": 3,
         },
         "medication": {
-            "Yes — all doses": 0,
+            "Yes (all doses)": 0,
             "Missed one dose": 1,
             "Missed all doses": 2,
             "No medication today": 0,
@@ -504,11 +519,23 @@ def submit_checkin(
             "Worse than yesterday": 2,
             "Much worse": 3,
         },
+        "sleep": {
+            "Well": 0,
+            "Okay": 1,
+            "Poor": 2,
+            "Very little": 3,
+        },
+        "appetite": {
+            "Normal": 0,
+            "Slightly low": 1,
+            "Very low": 2,
+            "Could not eat": 3,
+        },
     }
 
     score = sum(
         _score_answer(getattr(body, field), scoring[field])
-        for field in ["headache", "seizure", "energy", "nausea", "medication", "overall"]
+        for field in ["headache", "seizure", "energy", "nausea", "medication", "overall", "sleep", "appetite"]
     )
     level, emergency, message = _derive_level(score, body.seizure)
 
@@ -523,6 +550,8 @@ def submit_checkin(
         nausea=body.nausea,
         medication=body.medication,
         overall=body.overall,
+        sleep=body.sleep,
+        appetite=body.appetite,
         note=(body.note or "").strip() or None,
         score=score,
         level=level,
@@ -546,6 +575,8 @@ def submit_checkin(
         nausea=checkin.nausea,
         medication=checkin.medication,
         overall=checkin.overall,
+        sleep=checkin.sleep,
+        appetite=checkin.appetite,
         note=checkin.note,
         score=checkin.score,
         level=checkin.level,
@@ -553,6 +584,36 @@ def submit_checkin(
         created_at=checkin.created_at,
         message=message,
     )
+
+
+
+@router.post("/notify")
+def notify_clinician(
+    body: NotifyRequest,
+    auth: tuple[Patient, str] = Depends(get_mobile_patient),
+    db: Session = Depends(get_db),
+):
+    """Persist a lightweight clinician alert (dev).
+
+    This endpoint records an emergency chat message and returns success.
+    In production this should trigger email/push notifications to the assigned clinician.
+    """
+    patient, _role = auth
+    message = (body.message or "").strip()
+    if not message:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Message is required")
+
+    chat = ChatMessage(
+        patient_id=patient.id,
+        user_message=message,
+        bot_reply="Clinician notified (dev)",
+        emergency=True,
+    )
+    db.add(chat)
+    db.commit()
+    db.refresh(chat)
+
+    return {"notified": True, "id": chat.id, "message": "Clinician notified (dev)"}
 
 
 @router.get("/chat/history", response_model=list[ChatHistoryItem])
@@ -621,6 +682,34 @@ def patient_report(
             for p in plans
         ],
     }
+
+
+class PatientSettingsRequest(BaseModel):
+    tumour_type: str | None = None
+
+
+@router.put("/patient")
+def update_mobile_patient(
+    body: PatientSettingsRequest,
+    auth: tuple[Patient, str] = Depends(get_mobile_patient),
+    db: Session = Depends(get_db),
+):
+    """Allow mobile users to update limited patient settings (tumour_type).
+
+    This endpoint updates only safe fields that patients can change from the mobile app.
+    """
+    patient, _role = auth
+    updated = False
+    if body.tumour_type is not None:
+        patient.tumour_type = body.tumour_type.strip() or None
+        updated = True
+
+    if updated:
+        db.add(patient)
+        db.commit()
+        db.refresh(patient)
+
+    return _patient_payload(patient)
 
 
 @router.post("/chat", response_model=ChatResponse)

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import i18n from '../i18n'
+import { api } from '../api'
 
 function fmt24to12(t) {
   const [h, m] = t.split(':').map(Number)
@@ -32,6 +33,10 @@ export default function Setup() {
         ? 'denied'
         : null
   )
+  const [userType, setUserType] = useState(localStorage.getItem('mobile_user_type') || 'brain_tumor_patient')
+  const [tumourGrade, setTumourGrade] = useState(localStorage.getItem('mobile_tumour_grade') || '')
+  const [saved, setSaved] = useState(false)
+  const [saving, setSaving] = useState(false)
 
   async function requestNotifications() {
     if (!('Notification' in window)) { setNotifStatus('denied'); return }
@@ -39,10 +44,53 @@ export default function Setup() {
     setNotifStatus(r === 'granted' ? 'granted' : 'denied')
   }
 
-  function goHome() {
-    localStorage.setItem(`setup_done_${patient.hospital_id}`, '1')
-    localStorage.setItem('reminder_time', reminderTime)
-    navigate('/home')
+  async function goHome() {
+    setSaving(true)
+    try {
+      // Persist tumour type on the server when available
+      if (tumourGrade) {
+        try {
+          await api('/mobile/patient', { method: 'PUT', body: { tumour_type: tumourGrade } })
+        } catch (e) {
+          // ignore server errors — still save locally
+        }
+      }
+    } finally {
+      localStorage.setItem(`setup_done_${patient.hospital_id}`, '1')
+      localStorage.setItem('reminder_time', reminderTime)
+      localStorage.setItem('mobile_user_type', userType)
+      if (tumourGrade) localStorage.setItem('mobile_tumour_grade', tumourGrade)
+
+      // Update mobile_patient object so Home shows updated tumour_type and monitoring frequency immediately
+      try {
+        const raw = localStorage.getItem('mobile_patient')
+        if (raw) {
+          const p = JSON.parse(raw)
+          if (tumourGrade) p.tumour_type = tumourGrade
+          // compute monitoring_frequency locally (same rules as backend)
+          const v = (p.tumour_type || '').toLowerCase()
+          if (!v || v === 'not classified') {
+            p.monitoring_frequency = 'Reminder not configured'
+          } else if (v.includes('no tumor') || v.includes('no tumour')) {
+            p.monitoring_frequency = 'No reminder'
+          } else if (v.includes('grade i') || v.includes('grade ii')) {
+            p.monitoring_frequency = 'Weekly reminder'
+          } else if (v.includes('grade iii') || v.includes('grade iv')) {
+            p.monitoring_frequency = 'Daily reminder'
+          } else {
+            p.monitoring_frequency = 'Reminder not configured'
+          }
+          localStorage.setItem('mobile_patient', JSON.stringify(p))
+        }
+      } catch (e) {}
+      setSaving(false)
+      setSaved(true)
+      // show saved banner briefly so user sees confirmation
+      setTimeout(() => {
+        setSaved(false)
+        navigate('/home')
+      }, 700)
+    }
   }
 
   return (
@@ -126,6 +174,42 @@ export default function Setup() {
 
       {/* ── Body ── */}
       <div style={{ flex:1, padding:'20px 20px 24px', display:'flex', flexDirection:'column', gap:12, animation:'fadeUp 0.35s ease 0.12s both', overflow:'hidden' }}>
+        {saved && (
+          <div style={{ background:'#ecfdf5', border:'1px solid #bbf7d0', color:'#065f46', padding:'10px 12px', borderRadius:10, fontWeight:700, marginBottom:6, textAlign:'center' }}>
+            Settings saved
+          </div>
+        )}
+        {/* User type */}
+        <div style={{ background:'#f8fafc', border:'1.5px solid #e2e8f0', borderRadius:14, padding:'16px 16px 14px' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
+            <div style={{ width:26, height:26, borderRadius:7, background:'#eff6ff', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2.2" strokeLinecap="round"><path d="M12 2v6"/><path d="M12 22v-6"/></svg>
+            </div>
+            <div>
+              <div style={{ fontSize:13, fontWeight:700, color:'#0f172a', lineHeight:1 }}>I am a</div>
+              <div style={{ fontSize:11, color:'#94a3b8', marginTop:3 }}>Choose the role that best describes you</div>
+            </div>
+          </div>
+
+          <div style={{ display:'flex', gap:10 }}>
+            <button onClick={() => setUserType('brain_tumor_patient')} style={{ flex:1, padding:12, borderRadius:10, border: userType === 'brain_tumor_patient' ? '2px solid #0d9488' : '1px solid #e2e8f0', background: userType === 'brain_tumor_patient' ? '#f0fdfa' : '#fff', fontWeight:700, cursor:'pointer' }}>Brain Tumor Patient</button>
+            <button onClick={() => setUserType('normal_user')} style={{ flex:1, padding:12, borderRadius:10, border: userType === 'normal_user' ? '2px solid #0d9488' : '1px solid #e2e8f0', background: userType === 'normal_user' ? '#f0fdfa' : '#fff', fontWeight:700, cursor:'pointer' }}>Normal User</button>
+          </div>
+
+          {userType === 'brain_tumor_patient' && (
+            <div style={{ marginTop:12 }}>
+              <div style={{ fontSize:11, color:'#64748b', marginBottom:6 }}>Tumour grade (optional)</div>
+              <select value={tumourGrade} onChange={e => setTumourGrade(e.target.value)} style={{ width:'100%', padding:10, borderRadius:10, border:'1px solid #e2e8f0' }}>
+                <option value="">Not specified</option>
+                <option value="Grade I">Grade I</option>
+                <option value="Grade II">Grade II</option>
+                <option value="Grade III">Grade III</option>
+                <option value="Grade IV">Grade IV</option>
+              </select>
+            </div>
+          )}
+
+        </div>
 
         {/* Reminder card */}
         <div style={{ background:'#f8fafc', border:'1.5px solid #e2e8f0', borderRadius:14, padding:'16px 16px 14px' }}>
@@ -145,14 +229,14 @@ export default function Setup() {
             <input
               type="time" value={reminderTime} autoFocus
               onChange={e => { setReminderTime(e.target.value); setShowPicker(false) }}
-              style={{ width:'100%', padding:'10px 14px', fontSize:15, fontWeight:700, color:'#0d9488', border:'2px solid #0d9488', borderRadius:10, background:'#fff', fontFamily:"'DM Mono',monospace", outline:'none', boxSizing:'border-box' }}
+              style={{ width:'100%', padding:'10px 14px', fontSize:15, fontWeight:700, color:'#0d9488', border:'2px solid #0d9488', borderRadius:10, background:'#fff', fontFamily:"'DM Sans',sans-serif", outline:'none', boxSizing:'border-box' }}
             />
           ) : (
             <button
               className="time-btn"
               onClick={() => setShowPicker(true)}
               style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between', background:'#fff', border:'1.5px solid #e2e8f0', borderRadius:10, padding:'10px 14px', cursor:'pointer', transition:'background 0.15s' }}>
-              <span style={{ fontSize:17, fontWeight:800, color:'#0d9488', fontFamily:"'DM Mono',monospace", letterSpacing:'0.03em' }}>
+              <span style={{ fontSize:17, fontWeight:800, color:'#0d9488', fontFamily:"'DM Sans',sans-serif", letterSpacing:'0.03em' }}>
                 {fmt24to12(reminderTime)}
               </span>
               <span style={{ fontSize:11, color:'#94a3b8', fontWeight:500 }}>{t('setup.tapToChange')}</span>
@@ -221,6 +305,27 @@ export default function Setup() {
             letterSpacing:'0.01em', transition:'opacity 0.15s, transform 0.15s',
           }}>
           {isSettings ? t('setup.saveSettings') : t('setup.goHome')}
+        </button>
+
+        <button
+          onClick={() => {
+            localStorage.setItem('mobile_user_type', 'brain_tumor_patient')
+            if (tumourGrade) localStorage.setItem('mobile_tumour_grade', tumourGrade)
+            navigate('/checkin', { state: { forceUserType: 'brain_tumor_patient' } })
+          }}
+          style={{
+            width:'100%',
+            padding:'13px 0',
+            background:'#fff',
+            color:'#0d9488',
+            border:'1.5px solid #0d9488',
+            borderRadius:12,
+            fontSize:14,
+            fontWeight:700,
+            cursor:'pointer',
+            marginTop:10,
+          }}>
+          Daily Check-in →
         </button>
 
       </div>
