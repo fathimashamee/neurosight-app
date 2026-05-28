@@ -216,3 +216,25 @@ def patient_alerts(limit: int = 50, db: Session = Depends(get_db), current_user:
         })
 
     return alerts
+
+
+@router.get("/symptom-reports/{patient_id}")
+def symptom_reports(patient_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
+    rows = (
+        db.query(ChatMessage)
+        .filter(
+            ChatMessage.patient_id == patient_id,
+            ChatMessage.topic == "symptom_report",
+        )
+        .order_by(ChatMessage.created_at.desc())
+        .limit(100)
+        .all()
+    )
+    return [
+        {
+            "id": r.id,
+            "message": r.user_message,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in rows
+    ]
