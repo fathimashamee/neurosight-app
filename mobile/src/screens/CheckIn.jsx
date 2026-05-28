@@ -415,7 +415,7 @@ export default function CheckIn() {
       // Handle authentication errors specifically
       if (err && (err.status === 401 || (err.message || '').toLowerCase().includes('token') || (err.message || '').toLowerCase().includes('unauthorized'))) {
         localStorage.removeItem('mobile_token')
-        setError('Authentication error — please sign in again')
+        setError('Authentication error. Please sign in again.')
         navigate('/login', { replace: true })
         return
       }
@@ -433,7 +433,7 @@ export default function CheckIn() {
         .ci-option:active { transform: scale(0.99); }
       `}</style>
 
-        <div style={{ background:'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)', padding:'36px 24px 28px', position:'relative', overflow:'hidden' }}>
+        <div style={{ background:'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)', padding:'48px 20px 28px', position:'relative', overflow:'hidden' }}>
         <div style={{ position:'absolute', top:-34, right:-28, width:140, height:140, borderRadius:'50%', background:'rgba(255,255,255,0.08)', pointerEvents:'none' }} />
 
         <div style={{ animation:'fadeUp 0.35s ease both' }}>
@@ -448,7 +448,7 @@ export default function CheckIn() {
 
       
 
-      <div style={{ flex:1, background:'#fff', borderRadius:'24px 24px 0 0', marginTop:6, padding:'16px 20px 24px', boxShadow:'0 -4px 20px rgba(0,0,0,0.06)' }}>
+      <div style={{ flex:1, background:'#fff', borderRadius:'24px 24px 0 0', marginTop:6, padding:'16px 20px 82px', boxShadow:'0 -4px 20px rgba(0,0,0,0.06)' }}>
         {showForcedBanner && (
           <div style={{ marginBottom:10, padding:'10px 12px', borderRadius:12, background:'#ecfeff', border:'1px solid #bbf7d0', color:'#064e3b', fontWeight:700 }}>Opening brain‑tumour check‑in…</div>
         )}

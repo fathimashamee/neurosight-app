@@ -44,6 +44,22 @@ export default function Home() {
     try { return JSON.parse(localStorage.getItem('mobile_latest_checkin') || 'null') } catch { return null }
   })
 
+  // ── Report / diagnosis-confirmed notification ──────────────────────────────
+  const [reportData, setReportData] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('mobile_report') || 'null') } catch { return null }
+  })
+  const notifKey = `report_notif_seen_${patient.hospital_id}`
+  const [notifDismissed, setNotifDismissed] = useState(
+    () => localStorage.getItem(notifKey) === 'true'
+  )
+  const diagnosisConfirmed = reportData?.scan?.doctor_confirmed === true
+  const showNotif          = diagnosisConfirmed && !notifDismissed
+
+  function dismissNotif() {
+    localStorage.setItem(notifKey, 'true')
+    setNotifDismissed(true)
+  }
+
   useEffect(() => {
     if (!checkin) {
       api('/mobile/checkins/latest')
@@ -55,6 +71,16 @@ export default function Home() {
         })
         .catch(() => {})
     }
+  }, [])
+
+  // Fetch report in background to detect doctor-confirmed notification
+  useEffect(() => {
+    api('/mobile/report')
+      .then(d => {
+        setReportData(d)
+        localStorage.setItem('mobile_report', JSON.stringify(d))
+      })
+      .catch(() => {})
   }, [])
 
   function cycleLang() {
@@ -144,7 +170,18 @@ export default function Home() {
       </div>
 
       {/* ── Body ───────────────────────────────────────────────────── */}
-      <div style={{ flex: 1, padding: '14px 14px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div style={{ flex: 1, padding: '14px 14px 82px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+        {/* ── Diagnosis confirmed notification banner ────────────── */}
+        {showNotif && (
+          <DiagnosisNotifBanner
+            reportData={reportData}
+            lang={currentLang}
+            navigate={navigate}
+            onDismiss={dismissNotif}
+            onOpen={() => { dismissNotif(); navigate('/report') }}
+          />
+        )}
 
         {/* Setup reminder banner */}
         {!setupDone && (
@@ -216,7 +253,12 @@ export default function Home() {
                   display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 9,
                   cursor: 'pointer', textAlign: 'left',
                   boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                  position: 'relative',
                 }}>
+                {/* NEW dot badge on Report card when unread confirmed notification */}
+                {key === 'report' && showNotif && (
+                  <div style={{ position:'absolute', top:10, right:10, width:9, height:9, borderRadius:'50%', background:'#ef4444', boxShadow:'0 0 0 2px #fff' }} />
+                )}
                 <div style={{ width: 33, height: 33, borderRadius: 9, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
                   <Icon color={iconColor} />
                 </div>
@@ -259,6 +301,107 @@ export default function Home() {
           </button>
         </div>
 
+      </div>
+    </div>
+  )
+}
+
+// ── Diagnosis Confirmed Notification Banner ───────────────────────────────────
+
+const NOTIF_STR = {
+  en: {
+    badge:    'NEW · DIAGNOSIS CONFIRMED',
+    title:    'Your diagnosis has been confirmed',
+    sub:      'Your doctor has reviewed your MRI and confirmed your diagnosis. Tap to view your full medical report.',
+    btn:      'View Report',
+  },
+  si: {
+    badge:    'නව · රෝග විනිශ්චය තහවුරු විය',
+    title:    'ඔබේ රෝග විනිශ්චය තහවුරු කර ඇත',
+    sub:      'ඔබේ වෛද්‍යවරයා ඔබේ MRI සමාලෝචනය කර රෝග විනිශ්චය තහවුරු කළේය. සම්පූර්ණ වෛද්‍ය වාර්තාව බැලීමට ස්පර්ශ කරන්න.',
+    btn:      'වාර්තාව බලන්න',
+  },
+  ta: {
+    badge:    'புதிய · நோய் கண்டறிதல் உறுதி',
+    title:    'உங்கள் நோய் கண்டறிதல் உறுதிப்படுத்தப்பட்டது',
+    sub:      'உங்கள் மருத்துவர் உங்கள் MRI ஐ மதிப்பாய்வு செய்து நோயை உறுதிப்படுத்தினார். முழு மருத்துவ அறிக்கையை பார்க்க தட்டுங்கள்.',
+    btn:      'அறிக்கை பாருங்கள்',
+  },
+}
+
+function DiagnosisNotifBanner({ reportData, lang, navigate, onDismiss, onOpen }) {
+  const n      = NOTIF_STR[lang] || NOTIF_STR.en
+  const scan   = reportData?.scan
+  const label  = scan?.final_label || ''
+
+  // pick accent colour from the confirmed condition
+  const ACCENT_MAP = {
+    glioma:      '#2563eb',
+    meningioma:  '#9333ea',
+    pituitary:   '#ea580c',
+    no_tumor:    '#16a34a',
+  }
+  let accent = '#0d9488'
+  const lo = label.toLowerCase()
+  if (lo.includes('glioma') || lo.includes('gbm'))      accent = ACCENT_MAP.glioma
+  else if (lo.includes('meningioma'))                   accent = ACCENT_MAP.meningioma
+  else if (lo.includes('pituitary') || lo.includes('adenoma')) accent = ACCENT_MAP.pituitary
+  else if (lo.includes('no tumor') || lo.includes('no tumour')) accent = ACCENT_MAP.no_tumor
+
+  return (
+    <div
+      onClick={onOpen}
+      style={{
+        background:   `linear-gradient(135deg, ${accent}f0, ${accent}cc)`,
+        borderRadius: 16,
+        padding:      '14px 14px 14px 14px',
+        cursor:       'pointer',
+        animation:    'fadeUp 0.4s ease both',
+        position:     'relative',
+        overflow:     'hidden',
+        boxShadow:    `0 4px 16px ${accent}44`,
+      }}
+    >
+      {/* Decorative circle */}
+      <div style={{ position:'absolute', top:-20, right:-20, width:90, height:90, borderRadius:'50%', background:'rgba(255,255,255,0.1)', pointerEvents:'none' }} />
+
+      {/* Badge row */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+          {/* Bell icon */}
+          <div style={{ width:26, height:26, borderRadius:8, background:'rgba(255,255,255,0.22)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+            </svg>
+          </div>
+          <span style={{ fontSize:9.5, fontWeight:700, letterSpacing:'0.1em', textTransform:'uppercase', color:'rgba(255,255,255,0.9)' }}>
+            {n.badge}
+          </span>
+        </div>
+        {/* Dismiss × */}
+        <button
+          onClick={e => { e.stopPropagation(); onDismiss() }}
+          style={{ background:'rgba(255,255,255,0.18)', border:'none', borderRadius:6, width:24, height:24, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', color:'#fff', fontSize:13, lineHeight:1, flexShrink:0 }}
+        >
+          ×
+        </button>
+      </div>
+
+      {/* Title */}
+      <div style={{ fontSize:14, fontWeight:800, color:'#fff', lineHeight:1.3, marginBottom:5 }}>{n.title}</div>
+
+      {/* Subtitle */}
+      <div style={{ fontSize:11.5, color:'rgba(255,255,255,0.88)', lineHeight:1.6, marginBottom:12 }}>{n.sub}</div>
+
+      {/* CTA button */}
+      <div style={{ display:'flex', justifyContent:'flex-end' }}>
+        <div style={{ background:'rgba(255,255,255,0.22)', border:'1px solid rgba(255,255,255,0.35)', borderRadius:9, padding:'7px 14px', display:'inline-flex', alignItems:'center', gap:5 }}>
+          <span style={{ fontSize:12, fontWeight:700, color:'#fff' }}>{n.btn}</span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round">
+            <polyline points="9 18 15 12 9 6"/>
+          </svg>
+        </div>
       </div>
     </div>
   )

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { api } from '../api'
+import BackButton from './BackButton'
 
 function planTone(level) {
   if (level === 'GREEN') return { bg: '#f0fdf4', border: '#bbf7d0', text: '#166534', title: 'Calm day', subtitle: 'GREEN' }
@@ -38,9 +39,10 @@ export default function Result() {
 
   return (
     <div style={{ minHeight:'100vh', background:'#f8fafc', fontFamily:"'DM Sans', sans-serif", display:'flex', flexDirection:'column' }}>
-      <div style={{ background:'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)', padding:'36px 24px 28px', position:'relative', overflow:'hidden' }}>
+      <div style={{ background:'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)', padding:'36px 20px 28px', position:'relative', overflow:'hidden' }}>
         <div style={{ position:'absolute', top:-34, right:-28, width:140, height:140, borderRadius:'50%', background:'rgba(255,255,255,0.08)', pointerEvents:'none' }} />
-        <div style={{ fontSize:11, fontWeight:800, letterSpacing:'0.18em', textTransform:'uppercase', color:'rgba(255,255,255,0.72)', marginBottom:8 }}>Daily Check-in result</div>
+        <BackButton variant="glass" to="/checkin" />
+        <div style={{ fontSize:11, fontWeight:800, letterSpacing:'0.18em', textTransform:'uppercase', color:'rgba(255,255,255,0.72)', marginBottom:8, marginTop:14 }}>Daily Check-in result</div>
         <div style={{ fontSize:24, fontWeight:800, color:'#fff', lineHeight:1.2 }}>{patient.name || '—'}</div>
         <div style={{ fontSize:13, color:'rgba(255,255,255,0.74)', marginTop:6 }}>A clear summary of your latest check-in and recommended next steps.</div>
       </div>
@@ -99,7 +101,7 @@ export default function Result() {
               <div style={{ marginTop:16, padding:'14px 16px', borderRadius:16, background:'#fff7ed', border:'1px solid #fed7aa', color:'#c2410c' }}>
                 <div style={{ fontSize:14, fontWeight:800, marginBottom:8 }}>Your doctor has been alerted.</div>
                 <div style={{ fontSize:13, marginBottom:6 }}>Your symptoms are concerning. Dr. Perera has been notified.</div>
-                <div style={{ fontSize:13, marginBottom:12 }}>Please rest and stay calm. If emergency — call 1990.</div>
+                <div style={{ fontSize:13, marginBottom:12 }}>Please rest and stay calm. If it is an emergency, call 1990.</div>
                 <div style={{ display:'flex', justifyContent:'center' }}>
                   <a href="tel:1990" style={{ display:'inline-block', textAlign:'center', padding:'12px 20px', borderRadius:10, border:'none', background:'#dc2626', color:'#fff', fontWeight:800, textDecoration:'none', minWidth:180 }}>CALL 1990</a>
                 </div>
