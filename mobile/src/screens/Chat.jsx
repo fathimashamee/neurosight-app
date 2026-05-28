@@ -163,10 +163,9 @@ export default function Chat() {
         <div style={{ position:'absolute', top:-20, right:-20, width:110, height:110, borderRadius:'50%', background:'rgba(255,255,255,0.07)', pointerEvents:'none' }} />
         <div style={{ position:'absolute', bottom:-28, left:-28, width:80, height:80, borderRadius:'50%', background:'rgba(255,255,255,0.05)', pointerEvents:'none' }} />
 
-        <div style={{ position:'relative', zIndex:1, display:'flex', alignItems:'center', gap:12 }}>
-          {/* Back */}
-          <BackButton variant="glass" to="/home" />
+        <BackButton variant="glass" to="/home" />
 
+        <div style={{ position:'relative', zIndex:1, display:'flex', alignItems:'center', gap:12 }}>
           {/* Bot icon */}
           <div style={{ width:44, height:44, borderRadius:13, background:'rgba(255,255,255,0.18)', border:'1px solid rgba(255,255,255,0.25)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, backdropFilter:'blur(8px)' }}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.7" strokeLinecap="round">

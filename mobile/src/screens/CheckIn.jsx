@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api } from '../api'
+import BackButton from './BackButton'
 
 const BRAIN_QUESTIONS = [
   {
@@ -436,7 +437,8 @@ export default function CheckIn() {
         <div style={{ background:'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)', padding:'48px 20px 28px', position:'relative', overflow:'hidden' }}>
         <div style={{ position:'absolute', top:-34, right:-28, width:140, height:140, borderRadius:'50%', background:'rgba(255,255,255,0.08)', pointerEvents:'none' }} />
 
-        <div style={{ animation:'fadeUp 0.35s ease both' }}>
+        <BackButton variant="glass" to="/home" />
+        <div style={{ animation:'fadeUp 0.35s ease both', marginTop:14 }}>
           <div style={{ fontSize:11, fontWeight:800, letterSpacing:'0.18em', textTransform:'uppercase', color:'rgba(255,255,255,0.72)', marginBottom:8 }}>Daily Check-in</div>
           <div style={{ fontSize:24, fontWeight:800, color:'#fff', lineHeight:1.2 }}>{patient.name || '—'}</div>
           <div style={{ fontSize:13, color:'rgba(255,255,255,0.74)', marginTop:6 }}>Start anytime with Daily Check-in.</div>
@@ -598,7 +600,6 @@ export default function CheckIn() {
             </div>
           </div>
         )}
-        <button onClick={() => navigate('/home')} style={{ width:'100%', marginTop:18, padding:'14px 16px', border:'none', borderRadius:12, background:'#0d9488', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer' }}> Back to Home</button>
       </div>
     </div>
   )

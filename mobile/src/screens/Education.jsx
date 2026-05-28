@@ -322,11 +322,11 @@ export default function Education() {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: '#f8fafc', fontFamily: "'DM Sans', sans-serif", overflow: 'hidden' }}>
 
       {/* ══════════════════════ HEADER ══════════════════════ */}
-      <div style={{ flexShrink: 0, backgroundColor: '#fff', boxShadow: '0 1px 0 #e2e8f0' }}>
+      <div style={{ flexShrink: 0, backgroundColor: '#fff', boxShadow: '0 1px 0 #e2e8f0', position: 'relative' }}>
+        <BackButton variant="solid" />
 
         {/* Top bar */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px' }}>
-          <BackButton variant="solid" />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px 12px 100px' }}>
 
           <div style={{ flex: 1, minWidth: 0 }}>
             <p style={{ fontSize: '10px', fontWeight: 600, color: '#94a3b8', letterSpacing: '0.8px', textTransform: 'uppercase', margin: '0 0 2px' }}>Patient Education</p>
