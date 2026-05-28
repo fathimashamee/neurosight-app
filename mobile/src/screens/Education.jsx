@@ -1,280 +1,413 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useTranslation } from 'react-i18next'
+import React, { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
+import { PROFILES, TAB_LABELS, getProfileKey } from './educationContent';
+import BackButton from './BackButton';
 
-function getContent(tumourType) {
-  const t = (tumourType || '').toLowerCase()
+/* ─────────────────────────────────────────────────────────────────────────────
+   SVG ICONS
+───────────────────────────────────────────────────────────────────────────── */
+const S = ({ size = 20, color = 'currentColor', children }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+    stroke={color} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+    {children}
+  </svg>
+);
+const Icons = {
+  back:    (p) => <S {...p}><polyline points="15 18 9 12 15 6"/></S>,
+  what:    (p) => <S {...p}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></S>,
+  treat:   (p) => <S {...p}><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></S>,
+  warn:    (p) => <S {...p}><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></S>,
+  ask:     (p) => <S {...p}><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></S>,
+  effects: (p) => <S {...p}><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></S>,
+  diet:    (p) => <S {...p}><path d="M3 2l1.5 9.5A5 5 0 009.5 16H12v4a2 2 0 004 0v-4h2.5a5 5 0 005-5V2"/><line x1="16" y1="2" x2="16" y2="8"/><line x1="12" y1="2" x2="12" y2="8"/></S>,
+  mind:    (p) => <S {...p}><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></S>,
+  check:   (p) => <S {...p}><polyline points="20 6 9 17 4 12"/></S>,
+  cross:   (p) => <S {...p}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></S>,
+  next:    (p) => <S {...p}><polyline points="9 18 15 12 9 6"/></S>,
+  prev:    (p) => <S {...p}><polyline points="15 18 9 12 15 6"/></S>,
+  info:    (p) => <S {...p}><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></S>,
+};
+const TAB_ICON_FNS = [Icons.what, Icons.treat, Icons.warn, Icons.ask, Icons.effects, Icons.diet, Icons.mind];
 
-  if (t.includes('no tumor') || t.includes('no tumour')) {
-    return {
-      name: 'No Tumour Found',
-      accent: '#16a34a',
-      accentBg: '#f0fdf4',
-      icon: '✓',
-      what: 'Your brain scan did not find a tumour. This is great news. Your doctor will continue to monitor your brain health with regular check-up scans to make sure everything stays well.',
-      treated: 'No tumour treatment is needed. Your care team may recommend regular follow-up scans (usually every 6–12 months). Living a healthy lifestyle — good sleep, regular exercise, low stress — supports your brain health.',
-      watchFor: [
-        'New or worsening headaches',
-        'Changes in vision or hearing',
-        'Memory or thinking problems',
-        'Unexplained nausea or dizziness',
-        'Seizures of any kind',
-        'Weakness or numbness in arms or legs',
-      ],
-      nutrition: 'Eat a balanced diet with plenty of fruits, vegetables, and whole grains. Stay hydrated (6–8 glasses of water daily). Regular light exercise like walking supports brain health. Avoid smoking and limit alcohol.',
-      seekHelp: [
-        'A sudden severe headache ("worst headache of your life")',
-        'Seizure or convulsion (even a first one)',
-        'Sudden loss of vision or ability to speak',
-        'One-sided weakness or numbness that comes on suddenly',
-        'Loss of consciousness',
-      ],
-    }
-  }
-
-  if (t.includes('glioblastoma') || (t.includes('glioma') && (t.includes('grade iv') || t.includes('grade iii') || t.includes('grade 4') || t.includes('grade 3')))) {
-    return {
-      name: 'High-Grade Glioma',
-      accent: '#1d4ed8',
-      accentBg: '#eff6ff',
-      icon: 'G',
-      what: 'A glioma is a tumour that starts in the glial cells — the supporting cells of the brain. High-grade gliomas (Grade III–IV, including Glioblastoma) grow faster and require prompt treatment. Your medical team will work with you closely throughout your care.',
-      treated: 'Treatment usually involves:\n• Surgery — to remove as much of the tumour as safely possible\n• Radiation therapy — targeted rays to destroy remaining tumour cells\n• Chemotherapy — often temozolomide (TMZ) tablets taken alongside radiation\n• Regular MRI scans to monitor progress\n\nYour care team will create a personalised plan for you.',
-      watchFor: [
-        'Persistent headaches, especially in the morning',
-        'Seizures (any type)',
-        'Memory or concentration problems',
-        'Difficulty speaking or finding words',
-        'Vision changes or double vision',
-        'Weakness on one side of the body',
-        'Personality or mood changes',
-        'Nausea and vomiting',
-      ],
-      nutrition: 'Good nutrition is especially important during treatment:\n• High-protein foods (eggs, fish, lean meat, lentils, chickpeas) help tissue repair\n• Eat plenty of colourful vegetables and fruits for antioxidants\n• Small, frequent meals if nausea is a problem\n• Stay well hydrated — at least 6–8 glasses of water daily\n• Avoid alcohol completely during chemotherapy\n• Ask your team about anti-nausea tips if needed',
-      seekHelp: [
-        'Sudden or worsening seizure',
-        'Sudden severe headache',
-        'Sudden loss of speech or vision',
-        'High fever (could signal infection during chemo — call immediately)',
-        'Extreme confusion or loss of consciousness',
-        'Signs of deep vein thrombosis: calf pain, swelling, redness',
-      ],
-    }
-  }
-
-  if (t.includes('glioma') || t.includes('astrocytoma') || t.includes('oligodendroglioma')) {
-    return {
-      name: 'Glioma (Low-Grade)',
-      accent: '#1d4ed8',
-      accentBg: '#eff6ff',
-      icon: 'G',
-      what: 'A glioma is a tumour that grows from the glial cells — the supporting cells of the brain. Low-grade gliomas (Grade I–II) tend to grow slowly. Many people live well with careful monitoring and treatment when needed.',
-      treated: 'Treatment depends on size, location, and symptoms. Options include:\n• Watchful waiting with regular MRI scans\n• Surgery when safe to remove the tumour\n• Radiation therapy\n• Chemotherapy (PCV or temozolomide)\n\nYour doctor will recommend the best approach for your situation.',
-      watchFor: [
-        'Seizures — often the first sign of a low-grade glioma',
-        'Headaches that are new or getting worse',
-        'Memory or concentration problems',
-        'Weakness or numbness in limbs',
-        'Vision or speech changes',
-        'Fatigue that does not improve with rest',
-      ],
-      nutrition: 'During treatment, focus on:\n• Protein-rich foods to support recovery\n• Plenty of vegetables and fruits\n• Healthy fats: olive oil, avocado, nuts\n• Stay hydrated throughout the day\n• Avoid smoking and alcohol',
-      seekHelp: [
-        'New seizure or a change in your usual seizure pattern',
-        'Sudden severe headache',
-        'Sudden weakness, vision loss, or speech difficulty',
-        'High fever if on chemotherapy',
-        'Extreme confusion',
-      ],
-    }
-  }
-
-  if (t.includes('meningioma')) {
-    return {
-      name: 'Meningioma',
-      accent: '#9333ea',
-      accentBg: '#fdf4ff',
-      icon: 'M',
-      what: 'A meningioma grows from the meninges — the protective membranes that cover the brain and spinal cord. Most meningiomas are benign (not cancerous) and grow slowly. Many people live well with careful monitoring or treatment.',
-      treated: 'Treatment depends on the size, location, and whether it causes symptoms:\n• Watchful waiting — small, slow-growing meningiomas may just be monitored with regular scans\n• Surgery — to remove the tumour when safe\n• Stereotactic radiosurgery (e.g. Gamma Knife) — a precise form of radiation, often used for smaller tumours\n\nMany patients do very well after treatment.',
-      watchFor: [
-        'Headaches that are new or gradually worsening',
-        'Vision problems or hearing loss',
-        'Weakness or numbness in arms or legs',
-        'Seizures',
-        'Memory or thinking problems',
-        'Balance or coordination difficulties',
-      ],
-      nutrition: 'A healthy diet supports recovery:\n• Omega-3 rich foods (oily fish, flaxseed, walnuts) for brain health\n• Leafy greens (spinach, kale) for vitamins B and K\n• Colourful fruits and vegetables\n• Avoid high-sugar and processed foods\n• Limit caffeine if headaches are a problem',
-      seekHelp: [
-        'Sudden severe headache',
-        'New or worsening seizure',
-        'Sudden vision loss or double vision',
-        'New weakness or numbness on one side',
-        'Sudden confusion or loss of consciousness',
-      ],
-    }
-  }
-
-  if (t.includes('pituitary')) {
-    return {
-      name: 'Pituitary Tumour',
-      accent: '#ea580c',
-      accentBg: '#fff7ed',
-      icon: 'P',
-      what: 'A pituitary tumour grows in the pituitary gland — a small but vital gland at the base of the brain that controls many of your body\'s hormones. Most pituitary tumours are benign (non-cancerous) and are called adenomas. Treatment is usually very effective.',
-      treated: 'Treatment depends on the type and size:\n• Medication — for hormone-secreting tumours (e.g. bromocriptine for prolactinomas, cabergoline)\n• Surgery — usually through the nose (transsphenoidal approach), minimal scarring\n• Radiation — for tumours that return or are not fully removed\n\nMany patients respond very well to treatment.',
-      watchFor: [
-        'Vision changes — especially loss of peripheral (side) vision',
-        'Persistent headaches',
-        'Unexplained weight gain or loss',
-        'Extreme fatigue',
-        'Irregular periods or fertility problems (women)',
-        'Reduced sex drive',
-        'Milk discharge from nipples (not related to pregnancy)',
-        'Skin changes or muscle weakness (Cushing\'s)',
-      ],
-      nutrition: 'Your hormones affect metabolism and bone density:\n• Follow your doctor\'s dietary advice closely, especially around hormone replacement\n• Eat regular balanced meals to keep blood sugar stable\n• Calcium and vitamin D are important for bone health — ask your doctor\n• Stay hydrated\n• Maintain a healthy weight',
-      seekHelp: [
-        'Sudden severe headache with vision loss (pituitary apoplexy — emergency)',
-        'Sudden blindness or double vision',
-        'Extreme fatigue, very low blood pressure, or collapse',
-        'Signs of an adrenal crisis: vomiting, severe weakness, confusion',
-      ],
-    }
-  }
-
-  return {
-    name: 'Brain Tumour',
-    accent: '#0d9488',
-    accentBg: '#f0fdfa',
-    icon: 'B',
-    what: 'A brain tumour is an abnormal growth of cells in or around the brain. There are many different types. Your doctor has classified your condition and will create a personalised care plan tailored to you.',
-    treated: 'Treatment depends on the type, size, grade, and location of the tumour. Common approaches include:\n• Surgery — to remove as much of the tumour as possible\n• Radiation therapy — targeted treatment to destroy tumour cells\n• Chemotherapy — medicines to slow or stop tumour growth\n\nThese are often used together. Your care team will guide you through every step.',
-    watchFor: [
-      'New or worsening headaches',
-      'Seizures of any kind',
-      'Changes in vision, hearing, or speech',
-      'Memory or concentration problems',
-      'Nausea and vomiting',
-      'Weakness or numbness in limbs',
-      'Personality or mood changes',
-    ],
-    nutrition: 'Good nutrition supports your body during treatment:\n• Eat protein-rich foods to help repair tissues (eggs, fish, lentils, meat)\n• Include fruits and vegetables for vitamins and antioxidants\n• Small frequent meals if you feel nauseous\n• Stay well hydrated — at least 6–8 glasses of water daily\n• Ask your care team about any specific dietary needs',
-    seekHelp: [
-      'A sudden severe headache unlike any before',
-      'A new seizure or a change in your usual seizures',
-      'Sudden loss of vision, speech, or movement',
-      'High fever during treatment (possible infection — call immediately)',
-      'Extreme confusion or loss of consciousness',
-    ],
-  }
+/* ─────────────────────────────────────────────────────────────────────────────
+   TEXT HELPERS
+───────────────────────────────────────────────────────────────────────────── */
+// Detect leading control-emoji type
+function pfxOf(t) {
+  if (/^✅/.test(t)) return 'ok';
+  if (/^❌/.test(t)) return 'no';
+  if (/^⚠/.test(t))  return 'warn';
+  if (/^🔴/.test(t)) return 'red';
+  if (/^🟡/.test(t)) return 'yellow';
+  if (/^🟢/.test(t)) return 'green';
+  // Any other leading emoji (face, object, etc.)
+  if (/^[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(t)) return 'emoji';
+  return null;
 }
 
-function Section({ title, icon, children, defaultOpen = true }) {
-  const [open, setOpen] = useState(defaultOpen)
-  return (
-    <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.03)' }}>
-      <button
-        onClick={() => setOpen(o => !o)}
-        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
-        <span style={{ fontSize: 16 }}>{icon}</span>
-        <span style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', flex: 1 }}>{title}</span>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round"
-          style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0 }}>
-          <polyline points="6 9 12 15 18 9"/>
-        </svg>
-      </button>
-      {open && (
-        <div style={{ padding: '0 16px 16px', borderTop: '1px solid #f1f5f9' }}>
-          {children}
-        </div>
-      )}
-    </div>
-  )
+// Strip all leading emoji characters
+function noEmoji(s) {
+  return s.replace(/^[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}\u{200D}️\s]+/u, '').trim();
 }
 
-export default function Education() {
-  const navigate = useNavigate()
-  const { t } = useTranslation()
-  const patient = JSON.parse(localStorage.getItem('mobile_patient') || '{}')
-  const content = getContent(patient.tumour_type)
+/* ─────────────────────────────────────────────────────────────────────────────
+   CONTENT PRE-PROCESSOR
+   Joins soft-wrapped short lines into full paragraphs so justify works.
+   Sinhala/Tamil content was typed in a narrow chat — each "line" is only
+   a few words. We collapse those back into flowing paragraphs.
+───────────────────────────────────────────────────────────────────────────── */
+function buildSegments(raw) {
+  // A line is "structural" (kept separate) when it starts with a special prefix,
+  // a bullet dash, or is clearly an ALL-CAPS standalone heading.
+  const isStructural = (t) =>
+    pfxOf(t) !== null ||
+    /^[-•]/.test(t) ||
+    (t.length > 4 && t === t.toUpperCase() && /[A-Z]/.test(t));
 
+  const lines = raw.split('\n');
+  const segments = []; // { type: 'para'|'blank'|'structural', text }
+  let buf = [];
+
+  const flush = () => {
+    if (buf.length) {
+      segments.push({ type: 'para', text: buf.join(' ') });
+      buf = [];
+    }
+  };
+
+  for (const line of lines) {
+    const t = line.trim();
+    if (!t) { flush(); segments.push({ type: 'blank' }); continue; }
+    if (isStructural(t)) { flush(); segments.push({ type: 'structural', text: t }); }
+    else {
+      // If the last thing we pushed was a bullet, this is a continuation — join it.
+      const last = segments.length ? segments[segments.length - 1] : null;
+      if (buf.length === 0 && last && last.type === 'structural' && /^[-•]/.test(last.text)) {
+        const trailingDash = /\s*[—–]\s*$/.test(last.text);
+        last.text = last.text.replace(/\s*[—–]\s*$/, '').trimEnd() + (trailingDash ? ': ' : ' ') + t;
+      } else {
+        buf.push(t);
+      }
+    }
+  }
+  flush();
+
+  // Remove trailing blanks
+  while (segments.length && segments[segments.length - 1].type === 'blank') segments.pop();
+  return segments;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   WARNING TAB PARSER
+   Also joins multi-line warning titles (same narrow-chat wrapping problem).
+───────────────────────────────────────────────────────────────────────────── */
+const SEV = {
+  red:    { accent: '#dc2626', bg: '#fef2f2', border: '#fecaca', pillBg: '#fee2e2', pillText: '#991b1b', label: 'EMERGENCY'   },
+  yellow: { accent: '#d97706', bg: '#fffbeb', border: '#fde68a', pillBg: '#fef3c7', pillText: '#92400e', label: 'CALL DOCTOR' },
+  green:  { accent: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', pillBg: '#dcfce7', pillText: '#166534', label: 'MONITOR'     },
+};
+
+function parseWarnings(raw) {
+  const lines = raw.split('\n').map(l => l.trimEnd());
+  const groups = [];
+  let cur = null;
+
+  for (const line of lines) {
+    const t = line.trim();
+    if (!t) continue;
+    const p = pfxOf(t);
+
+    if (p === 'red' || p === 'yellow' || p === 'green') {
+      cur = { type: p, titleParts: [noEmoji(t)], bullets: [] };
+      groups.push(cur);
+    } else if (!cur) {
+      groups.push({ type: 'text', text: t });
+    } else if (/^[-•]/.test(t)) {
+      // Bullet item — also join any soft-wrapped continuations later
+      cur.bullets.push(t.replace(/^[-•]\s*/, ''));
+    } else if (cur.bullets.length === 0) {
+      // Still in title (continuation line before bullets started)
+      cur.titleParts.push(t.replace(/^[)\s:]+/, '')); // strip leading ): chars
+    } else {
+      // Continuation of the last bullet
+      const last = cur.bullets[cur.bullets.length - 1];
+      // Only join if it looks like a continuation (no dash, short)
+      if (!pfxOf(t) && !/^[-•]/.test(t)) {
+        cur.bullets[cur.bullets.length - 1] = last + ' ' + t;
+      } else {
+        cur.bullets.push(t);
+      }
+    }
+  }
+  return groups;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   WARNING TAB COMPONENT
+───────────────────────────────────────────────────────────────────────────── */
+function WarningTab({ text, lang = 'en' }) {
+  const groups = parseWarnings(text);
+  const ta = lang === 'en' ? 'justify' : 'left';
   return (
-    <div style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: "'DM Sans', sans-serif", display: 'flex', flexDirection: 'column' }}>
-      <style>{`@keyframes fadeUp { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }`}</style>
-
-      {/* Header */}
-      <div style={{ background: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)', padding: '48px 24px 28px', position: 'relative', overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', top: -30, right: -30, width: 130, height: 130, borderRadius: '50%', background: 'rgba(255,255,255,0.07)', pointerEvents: 'none' }} />
-        <button
-          onClick={() => navigate('/home')}
-          style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 10, color: '#fff', padding: '6px 12px', fontSize: 12, cursor: 'pointer', marginBottom: 16, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-          {t('education.back')}
-        </button>
-        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.65)', marginBottom: 6 }}>
-          {t('education.title')}
-        </div>
-        <div style={{ fontSize: 22, fontWeight: 800, color: '#fff' }}>{content.name}</div>
-        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', marginTop: 4 }}>{t('education.yourDiagnosis')}</div>
-      </div>
-
-      {/* Body */}
-      <div style={{ flex: 1, padding: '20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-
-        {/* Diagnosis badge */}
-        <div style={{ background: content.accentBg, border: `1px solid ${content.accent}30`, borderRadius: 16, padding: '16px', display: 'flex', alignItems: 'center', gap: 14, animation: 'fadeUp 0.3s ease both' }}>
-          <div style={{ width: 44, height: 44, borderRadius: 12, background: content.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 18, fontWeight: 800, flexShrink: 0 }}>
-            {content.icon}
-          </div>
-          <div>
-            <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, marginBottom: 2 }}>{t('education.yourDiagnosis')}</div>
-            <div style={{ fontSize: 15, fontWeight: 800, color: '#1e293b' }}>{patient.tumour_type || content.name}</div>
-          </div>
-        </div>
-
-        <Section title={t('education.whatIsIt')} icon="🧠">
-          <p style={{ fontSize: 13, color: '#334155', lineHeight: 1.7, margin: '12px 0 0' }}>{content.what}</p>
-        </Section>
-
-        <Section title={t('education.howTreated')} icon="💊">
-          <p style={{ fontSize: 13, color: '#334155', lineHeight: 1.7, margin: '12px 0 0', whiteSpace: 'pre-line' }}>{content.treated}</p>
-        </Section>
-
-        <Section title={t('education.watchFor')} icon="👁">
-          <ul style={{ margin: '12px 0 0', padding: '0 0 0 16px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {content.watchFor.map((item, i) => (
-              <li key={i} style={{ fontSize: 13, color: '#334155', lineHeight: 1.6 }}>{item}</li>
-            ))}
-          </ul>
-        </Section>
-
-        <Section title={t('education.nutrition')} icon="🥗">
-          <p style={{ fontSize: 13, color: '#334155', lineHeight: 1.7, margin: '12px 0 0', whiteSpace: 'pre-line' }}>{content.nutrition}</p>
-        </Section>
-
-        <Section title={t('education.seekHelp')} icon="🚨">
-          <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: '12px', marginTop: 12 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#dc2626', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
-              {t('education.seekHelpUrgent')}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+      {groups.map((g, i) => {
+        if (g.type === 'text') return (
+          <p key={i} style={{ fontSize: '13.5px', color: '#64748b', margin: 0, lineHeight: 1.75, textAlign: ta, wordBreak: 'break-word' }}>{g.text}</p>
+        );
+        const s = SEV[g.type];
+        const title = g.titleParts.join(' ');
+        return (
+          <div key={i} style={{ borderRadius: '12px', overflow: 'hidden', border: `1px solid ${s.border}` }}>
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 14px', backgroundColor: s.bg, borderBottom: `1px solid ${s.border}` }}>
+              <div style={{ width: '9px', height: '9px', borderRadius: '50%', backgroundColor: s.accent, flexShrink: 0, boxShadow: `0 0 0 3px ${s.accent}22` }} />
+              <span style={{ fontSize: '13.5px', fontWeight: 700, color: '#1e293b', flex: 1, lineHeight: 1.45 }}>{title}</span>
+              <span style={{ fontSize: '9px', fontWeight: 800, letterSpacing: '0.7px', color: s.pillText, backgroundColor: s.pillBg, padding: '3px 8px', borderRadius: '20px', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                {s.label}
+              </span>
             </div>
-            <ul style={{ margin: 0, padding: '0 0 0 16px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {content.seekHelp.map((item, i) => (
-                <li key={i} style={{ fontSize: 13, color: '#991b1b', lineHeight: 1.6 }}>{item}</li>
-              ))}
-            </ul>
+            {/* Bullets */}
+            {g.bullets.length > 0 && (
+              <div style={{ padding: '10px 14px 12px', backgroundColor: '#fff' }}>
+                {g.bullets.map((b, bi) => (
+                  <div key={bi} style={{ display: 'flex', gap: '10px', marginBottom: bi < g.bullets.length - 1 ? '7px' : 0 }}>
+                    <div style={{ width: '5px', height: '5px', borderRadius: '50%', backgroundColor: s.accent, marginTop: '8px', flexShrink: 0 }} />
+                    <span style={{ fontSize: '13.5px', color: '#374151', lineHeight: 1.65, textAlign: ta, wordBreak: 'break-word' }}>{b}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        </Section>
+        );
+      })}
+    </div>
+  );
+}
 
-        {/* General note */}
-        <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 12, padding: '12px 14px', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" style={{ flexShrink: 0, marginTop: 2 }}>
-            <circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>
-          </svg>
-          <p style={{ fontSize: 11, color: '#1e40af', margin: 0, lineHeight: 1.6 }}>{t('education.generalNote')}</p>
+/* ─────────────────────────────────────────────────────────────────────────────
+   CONTENT TAB COMPONENT
+───────────────────────────────────────────────────────────────────────────── */
+// justify works well for Latin script; left-align for Tamil/Sinhala to avoid
+// huge inter-word gaps that make the text unreadable
+const bodyStyle   = (lang) => ({ fontSize: '14px',   color: '#374151', lineHeight: lang === 'en' ? 1.8 : 1.9,  textAlign: lang === 'en' ? 'justify' : 'left', margin: '2px 0', wordBreak: 'break-word' });
+const bulletStyle = (lang) => ({ fontSize: '13.5px', color: '#374151', lineHeight: lang === 'en' ? 1.7 : 1.85, textAlign: lang === 'en' ? 'justify' : 'left', wordBreak: 'break-word' });
+
+function ContentTab({ text, accent, lang = 'en' }) {
+  const segments = buildSegments(text);
+
+  return (
+    <div>
+      {segments.map((seg, i) => {
+        /* ── blank gap ── */
+        if (seg.type === 'blank') return <div key={i} style={{ height: '10px' }} />;
+
+        /* ── joined paragraph ── */
+        if (seg.type === 'para') return (
+          <p key={i} style={bodyStyle(lang)}>{seg.text}</p>
+        );
+
+        /* ── structural line ── */
+        const t     = seg.text;
+        const pfx   = pfxOf(t);
+        const clean = noEmoji(t);
+        const ta    = lang === 'en' ? 'justify' : 'left';
+
+        // ✅ DO
+        if (pfx === 'ok') return (
+          <div key={i} style={{ display: 'flex', gap: '10px', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '9px 12px', margin: '4px 0' }}>
+            <div style={{ width: '20px', height: '20px', borderRadius: '6px', backgroundColor: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '1px' }}>
+              <Icons.check size={11} color="#fff" />
+            </div>
+            <span style={{ fontSize: '13.5px', color: '#15803d', fontWeight: 500, lineHeight: 1.65, textAlign: ta, wordBreak: 'break-word' }}>{clean}</span>
+          </div>
+        );
+
+        // ❌ AVOID
+        if (pfx === 'no') return (
+          <div key={i} style={{ display: 'flex', gap: '10px', backgroundColor: '#fff1f2', border: '1px solid #fecdd3', borderRadius: '10px', padding: '9px 12px', margin: '4px 0' }}>
+            <div style={{ width: '20px', height: '20px', borderRadius: '6px', backgroundColor: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '1px' }}>
+              <Icons.cross size={11} color="#fff" />
+            </div>
+            <span style={{ fontSize: '13.5px', color: '#b91c1c', fontWeight: 500, lineHeight: 1.65, textAlign: ta, wordBreak: 'break-word' }}>{clean}</span>
+          </div>
+        );
+
+        // ⚠️ note
+        if (pfx === 'warn') return (
+          <div key={i} style={{ display: 'flex', gap: '10px', backgroundColor: '#fffbeb', borderLeft: '3px solid #f59e0b', borderRadius: '0 10px 10px 0', padding: '9px 12px', margin: '8px 0' }}>
+            <Icons.warn size={15} color="#d97706" />
+            <span style={{ fontSize: '13.5px', color: '#92400e', fontWeight: 600, lineHeight: 1.65, textAlign: ta, wordBreak: 'break-word' }}>{clean}</span>
+          </div>
+        );
+
+        // Emoji-prefixed section heading (😴 TIREDNESS etc.) → strip emoji, show as heading
+        if (pfx === 'emoji') return (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '18px', marginBottom: '5px' }}>
+            <div style={{ width: '3px', height: '16px', backgroundColor: accent, borderRadius: '2px', flexShrink: 0 }} />
+            <span style={{ fontSize: '12px', fontWeight: 800, color: '#1e293b', letterSpacing: '0.4px', textTransform: 'uppercase' }}>
+              {clean}
+            </span>
+          </div>
+        );
+
+        // Bullet / dash line
+        if (/^[-•]/.test(t)) return (
+          <div key={i} style={{ display: 'flex', gap: '10px', margin: '4px 0 4px 2px' }}>
+            <div style={{ width: '5px', height: '5px', borderRadius: '50%', backgroundColor: `${accent}99`, marginTop: '9px', flexShrink: 0 }} />
+            <span style={bulletStyle(lang)}>{t.replace(/^[-•]\s*/, '')}</span>
+          </div>
+        );
+
+        // ALL-CAPS section label
+        if (t.length > 4 && t === t.toUpperCase() && /[A-Z]/.test(t)) return (
+          <p key={i} style={{ fontSize: '10.5px', fontWeight: 800, color: '#94a3b8', letterSpacing: '1.1px', textTransform: 'uppercase', margin: '18px 0 6px', paddingBottom: '5px', borderBottom: '1px solid #f1f5f9' }}>
+            {t}
+          </p>
+        );
+
+        // Fallback — body text
+        return <p key={i} style={bodyStyle(lang)}>{t}</p>;
+      })}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   MAIN SCREEN
+───────────────────────────────────────────────────────────────────────────── */
+export default function Education() {
+  const { i18n } = useTranslation();
+  const navigate = useNavigate();
+  const tabBarRef  = useRef(null);
+  const contentRef = useRef(null);
+
+  const rawLang = (i18n.language || 'en').slice(0, 2);
+  const lang = ['en', 'si', 'ta'].includes(rawLang) ? rawLang : 'en';
+
+  let patient = null;
+  try { patient = JSON.parse(localStorage.getItem('mobile_patient') || 'null'); } catch {}
+  const tumourType = patient?.tumour_type || patient?.tumor_type || '';
+  const profileKey = getProfileKey(tumourType);
+  const profile    = PROFILES[profileKey] || PROFILES.no_tumor;
+  const { meta }   = profile;
+  const tabs        = TAB_LABELS[lang];
+  const content     = profile[lang] || profile.en;
+
+  const [activeTab, setActiveTab] = useState(0);
+  const tabCount = tabs.length;
+
+  useEffect(() => {
+    tabBarRef.current
+      ?.querySelector(`[data-tab="${activeTab}"]`)
+      ?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+  }, [activeTab]);
+
+  function goTab(n) {
+    const next = Math.max(0, Math.min(tabCount - 1, n));
+    setActiveTab(next);
+    contentRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  const conditionName = meta.name[lang] || meta.name.en;
+  const TabIconComp   = TAB_ICON_FNS[activeTab];
+
+  const DISCLAIMER = {
+    en: (name) => <>Information personalised to your diagnosis of <strong style={{ color: '#475569', fontWeight: 600 }}>{name}</strong>. Always follow your doctor's advice and attend all scheduled appointments.</>,
+    si: (name) => <>මෙම තොරතුරු ඔබේ රෝග විනිශ්චය වන <strong style={{ color: '#475569', fontWeight: 600 }}>{name}</strong> සඳහා පෞද්ගලිකව සකස් කර ඇත. සෑම විටම ඔබේ වෛද්‍යවරයාගේ උපදෙස් අනුගමනය කර සැලසුම් කළ සියලු හමුවීම් වලට පැමිණෙන්න.</>,
+    ta: (name) => <>இந்த தகவல் உங்கள் <strong style={{ color: '#475569', fontWeight: 600 }}>{name}</strong> என்ற நோய் கண்டறிதலுக்காக தனிப்பட்ட முறையில் தயாரிக்கப்பட்டுள்ளது. எப்போதும் உங்கள் மருத்துவரின் அறிவுரையை பின்பற்றுங்கள் மற்றும் திட்டமிட்ட அனைத்து சந்திப்புகளுக்கும் வாருங்கள்.</>,
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: '#f8fafc', fontFamily: "'DM Sans', sans-serif", overflow: 'hidden' }}>
+
+      {/* ══════════════════════ HEADER ══════════════════════ */}
+      <div style={{ flexShrink: 0, backgroundColor: '#fff', boxShadow: '0 1px 0 #e2e8f0' }}>
+
+        {/* Top bar */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px' }}>
+          <BackButton variant="solid" />
+
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontSize: '10px', fontWeight: 600, color: '#94a3b8', letterSpacing: '0.8px', textTransform: 'uppercase', margin: '0 0 2px' }}>Patient Education</p>
+            <h1 style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{conditionName}</h1>
+          </div>
+
+          <div style={{ padding: '5px 11px', borderRadius: 20, flexShrink: 0, backgroundColor: `${meta.accent}12`, border: `1.5px solid ${meta.accent}30`, color: meta.accent, fontSize: '11px', fontWeight: 700, letterSpacing: '0.4px' }}>
+            {meta.icon}
+          </div>
         </div>
 
+        {/* Tab bar */}
+        <div ref={tabBarRef} style={{ display: 'flex', overflowX: 'auto', padding: '0 12px', gap: 2, scrollbarWidth: 'none', borderTop: '1px solid #f1f5f9' }}>
+          {tabs.map((label, i) => {
+            const active = i === activeTab;
+            const Ic = TAB_ICON_FNS[i];
+            return (
+              <button key={i} data-tab={i} onClick={() => goTab(i)}
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '10px 14px', border: 'none', background: 'transparent', cursor: 'pointer', flexShrink: 0, minWidth: 64, color: active ? meta.accent : '#94a3b8', borderBottom: active ? `2.5px solid ${meta.accent}` : '2.5px solid transparent', transition: 'all 0.18s', outline: 'none' }}>
+                <Ic size={18} color={active ? meta.accent : '#94a3b8'} />
+                <span style={{ fontSize: '9.5px', fontWeight: active ? 700 : 500, marginTop: 5, textAlign: 'center', maxWidth: 64, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ══════════════════════ CONTENT ══════════════════════ */}
+      <div ref={contentRef} style={{ flex: 1, overflowY: 'auto', scrollbarWidth: 'thin' }}>
+
+        {/* Section banner */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '13px 16px 11px', backgroundColor: meta.accentBg, borderBottom: `1px solid ${meta.accent}18` }}>
+          <div style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: meta.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <TabIconComp size={17} color="#fff" />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontSize: '9.5px', color: `${meta.accent}99`, fontWeight: 700, letterSpacing: '0.9px', textTransform: 'uppercase', margin: '0 0 1px' }}>Section {activeTab + 1} of {tabCount}</p>
+            <p style={{ fontSize: '14px', fontWeight: 700, color: meta.accent, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tabs[activeTab]}</p>
+          </div>
+          {/* Progress pills */}
+          <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0 }}>
+            {tabs.map((_, i) => (
+              <div key={i} onClick={() => goTab(i)} style={{ width: i === activeTab ? 18 : 5, height: 5, borderRadius: 3, cursor: 'pointer', backgroundColor: i === activeTab ? meta.accent : `${meta.accent}30`, transition: 'all 0.25s' }} />
+            ))}
+          </div>
+        </div>
+
+        {/* Card */}
+        <div style={{ padding: '16px 16px 8px' }}>
+          <div style={{ backgroundColor: '#fff', borderRadius: 16, padding: '20px 18px', boxShadow: '0 1px 3px rgba(0,0,0,0.06),0 4px 16px rgba(0,0,0,0.04)', border: '1px solid #f1f5f9' }}>
+            {/* Thin accent rule */}
+            <div style={{ height: 3, background: `linear-gradient(90deg,${meta.accent},${meta.accent}30)`, borderRadius: 2, marginBottom: 18 }} />
+
+            {activeTab === 2
+              ? <WarningTab text={content[2] || ''} lang={lang} />
+              : <ContentTab text={content[activeTab] || ''} accent={meta.accent} lang={lang} />
+            }
+          </div>
+        </div>
+
+        {/* Prev / Next */}
+        <div style={{ display: 'flex', gap: 10, padding: '8px 16px' }}>
+          <button onClick={() => goTab(activeTab - 1)} disabled={activeTab === 0}
+            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 0', borderRadius: 12, border: `1.5px solid ${activeTab === 0 ? '#e2e8f0' : '#e2e8f0'}`, background: activeTab === 0 ? '#f8fafc' : '#fff', color: activeTab === 0 ? '#cbd5e1' : '#475569', fontSize: '13.5px', fontWeight: 600, cursor: activeTab === 0 ? 'not-allowed' : 'pointer', boxShadow: activeTab === 0 ? 'none' : '0 1px 4px rgba(0,0,0,0.07)', transition: 'all 0.2s' }}>
+            <Icons.prev size={15} color={activeTab === 0 ? '#cbd5e1' : '#475569'} /> Previous
+          </button>
+
+          <button onClick={() => goTab(activeTab + 1)} disabled={activeTab === tabCount - 1}
+            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 0', borderRadius: 12, border: `1.5px solid ${activeTab === tabCount - 1 ? '#e2e8f0' : meta.accent}`, background: activeTab === tabCount - 1 ? '#f8fafc' : meta.accent, color: activeTab === tabCount - 1 ? '#cbd5e1' : '#fff', fontSize: '13.5px', fontWeight: 700, cursor: activeTab === tabCount - 1 ? 'not-allowed' : 'pointer', boxShadow: activeTab === tabCount - 1 ? 'none' : `0 4px 12px ${meta.accent}40`, transition: 'all 0.2s' }}>
+            Next <Icons.next size={15} color={activeTab === tabCount - 1 ? '#cbd5e1' : '#fff'} />
+          </button>
+        </div>
+
+        {/* Disclaimer */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, margin: '4px 16px 28px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: '12px 14px' }}>
+          <Icons.info size={15} color="#94a3b8" />
+          <p style={{ fontSize: '12px', color: '#64748b', margin: 0, lineHeight: 1.6, textAlign: lang === 'en' ? 'justify' : 'left', wordBreak: 'break-word' }}>
+            {(DISCLAIMER[lang] || DISCLAIMER.en)(conditionName)}
+          </p>
+        </div>
       </div>
     </div>
-  )
+  );
 }

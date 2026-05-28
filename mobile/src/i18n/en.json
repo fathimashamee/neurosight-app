@@ -44,10 +44,10 @@
     "reminderQuestion": "When would you like your daily health reminder?",
     "tapToChange": "tap to change",
     "notifQuestion": "Allow notifications?",
-    "notifSub": "Important for your care — we'll remind you to check in daily",
+    "notifSub": "Important for your care. We will remind you to check in daily.",
     "allowBtn": "Yes, Allow Notifications",
     "notifGranted": "Notifications enabled",
-    "notifDenied": "Blocked — enable in browser settings",
+    "notifDenied": "Blocked. Enable in browser settings.",
     "goHome": "Go to Home →",
     "saveSettings": "Save Settings →",
     "hint": "You can update these preferences anytime using the Settings icon on the home screen.",
@@ -112,7 +112,7 @@
     "setupBannerBtn": "Set up now →",
     "lastCheckin": "Your Last Check-in",
     "checkinScore": "Score",
-    "noCheckin": "No check-in yet — tap Daily Check-in to start",
+    "noCheckin": "No check-in yet. Tap Daily Check-in to start.",
     "viewDetails": "View Details"
   },
   "report": {
