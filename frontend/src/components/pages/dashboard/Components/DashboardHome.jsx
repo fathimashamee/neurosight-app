@@ -57,8 +57,10 @@ function StatusBadge({ label, map }) {
   );
 }
 
-const TH = { fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--ns-text-3)", padding: "0 12px 10px", whiteSpace: "nowrap" };
+const TH = { fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--ns-text-3)", padding: "0 12px 10px", whiteSpace: "nowrap", textAlign: "left" };
+const TH_C = { ...TH, textAlign: "center" };
 const TD = { fontSize: 13, padding: "11px 12px", borderTop: "1px solid var(--ns-border)", verticalAlign: "middle" };
+const TD_C = { ...TD, textAlign: "center" };
 
 function WorklistPanel({ worklist, loading, navigate }) {
   return (
@@ -74,14 +76,21 @@ function WorklistPanel({ worklist, loading, navigate }) {
       </div>
 
       <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
+          <colgroup>
+            <col style={{ width: "30%" }} />
+            <col style={{ width: "22%" }} />
+            <col style={{ width: "16%" }} />
+            <col style={{ width: "16%" }} />
+            <col style={{ width: "16%" }} />
+          </colgroup>
           <thead>
             <tr>
               <th style={{ ...TH, paddingLeft: 28 }}>Patient</th>
               <th style={TH}>Tumour</th>
-              <th style={TH}>Scan</th>
-              <th style={TH}>Plan</th>
-              <th style={{ ...TH, paddingRight: 28 }}>Admission</th>
+              <th style={TH_C}>Scan</th>
+              <th style={TH_C}>Plan</th>
+              <th style={{ ...TH_C, paddingRight: 28 }}>Admission</th>
             </tr>
           </thead>
           <tbody>
@@ -116,9 +125,9 @@ function WorklistPanel({ worklist, loading, navigate }) {
                   <td style={TD}>
                     <span style={{ fontSize: 12, color: "var(--ns-text-2)" }}>{row.tumour_type}</span>
                   </td>
-                  <td style={TD}><StatusBadge label={row.scan_status} map={SCAN_BADGE} /></td>
-                  <td style={TD}><StatusBadge label={row.plan_status} map={PLAN_BADGE} /></td>
-                  <td style={{ ...TD, paddingRight: 28 }}><StatusBadge label={row.admission_status} map={ADM_BADGE} /></td>
+                  <td style={TD_C}><StatusBadge label={row.scan_status} map={SCAN_BADGE} /></td>
+                  <td style={TD_C}><StatusBadge label={row.plan_status} map={PLAN_BADGE} /></td>
+                  <td style={{ ...TD_C, paddingRight: 28 }}><StatusBadge label={row.admission_status} map={ADM_BADGE} /></td>
                 </tr>
               ))
             )}
