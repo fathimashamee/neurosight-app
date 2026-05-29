@@ -264,7 +264,7 @@ export default function Home() {
 
         {/* Last check-in card */}
         <div style={{ background:'#fff', border:`1.5px solid ${ls ? ls.border : '#e2e8f0'}`, borderRadius:18, padding:'16px 16px', animation:'cardPop 0.45s cubic-bezier(.34,1.56,.64,1) 0.06s both', boxShadow:`0 2px 14px ${ls ? ls.dot + '22' : 'rgba(0,0,0,0.05)'}` }}>
-          <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:11 }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:6, marginBottom:11 }}>
             <div style={{ fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.12em', color:'#94a3b8' }}>
               {t('home.lastCheckin')}
             </div>
