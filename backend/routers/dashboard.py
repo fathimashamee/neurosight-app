@@ -1,7 +1,9 @@
+import json
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import func, exists, and_
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 
 from backend.db.database import get_db
 from backend.models.user import User
@@ -12,6 +14,7 @@ from backend.core.security import get_current_active_user, require_admin
 from backend.models.patient import Patient
 from backend.models.audit_log import AuditLog
 from backend.models.admission import Admission
+from backend.models.medication_log import MedicationLog
 from backend.routers.treatment_plans import TreatmentPlan
 
 # API Routers (Shameeha's addition)
@@ -238,3 +241,73 @@ def symptom_reports(patient_id: int, db: Session = Depends(get_db), current_user
         }
         for r in rows
     ]
+
+
+@router.get("/medication-adherence/{patient_id}")
+def medication_adherence(
+    patient_id: int,
+    days: int = 30,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Return medication plans and taken logs for the last N days for a patient."""
+    since_date = (date.today() - timedelta(days=days - 1)).isoformat()
+
+    plans = (
+        db.query(TreatmentPlan)
+        .filter(
+            TreatmentPlan.patient_id == patient_id,
+            TreatmentPlan.medications.isnot(None),
+            TreatmentPlan.medications != "",
+        )
+        .order_by(TreatmentPlan.id.desc())
+        .all()
+    )
+
+    medications = []
+    for plan in plans:
+        raw = plan.medications or ""
+        try:
+            items = json.loads(raw)
+            if not isinstance(items, list):
+                continue
+        except Exception:
+            continue
+        for idx, med in enumerate(items):
+            if not isinstance(med, dict) or not med.get("name"):
+                continue
+            medications.append({
+                "plan_id":    plan.id,
+                "plan_title": plan.title or "Care Plan",
+                "med_index":  idx,
+                "name":       med.get("name", ""),
+                "dosage":     med.get("dosage", ""),
+                "slots":      med.get("times", []),
+                "food":       med.get("food", ""),
+            })
+
+    logs = (
+        db.query(MedicationLog)
+        .filter(
+            MedicationLog.patient_id == patient_id,
+            MedicationLog.taken_date >= since_date,
+        )
+        .order_by(MedicationLog.taken_date.asc())
+        .all()
+    )
+
+    return {
+        "medications": medications,
+        "logs": [
+            {
+                "plan_id":    log.plan_id,
+                "med_index":  log.med_index,
+                "slot":       log.slot,
+                "taken_date": log.taken_date,
+                "taken_at":   log.taken_at.isoformat() if log.taken_at else None,
+            }
+            for log in logs
+        ],
+        "days": days,
+        "since": since_date,
+    }
