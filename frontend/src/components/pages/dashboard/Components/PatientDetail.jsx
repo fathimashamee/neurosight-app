@@ -178,6 +178,7 @@ const PatientDetail = () => {
   const [enrollmentStatus, setEnrollmentStatus] = useState(null);
   const [enrolling, setEnrolling] = useState(false);
   const [enrollResult, setEnrollResult] = useState(null);
+  const [medAdherence, setMedAdherence] = useState({ medications: [], logs: [], days: 30, since: '' });
   const [linkCopied, setLinkCopied] = useState(false);
   const [newCaretaker, setNewCaretaker] = useState({ name: '', phone: '', relation: '' });
   const [caretakerSaving, setCaretakerSaving] = useState(false);
@@ -226,6 +227,13 @@ const PatientDetail = () => {
         setSymptomReports(Array.isArray(reports) ? reports : []);
       } catch (e) {
         setSymptomReports([]);
+      }
+      // fetch medication adherence data for the monitoring tab
+      try {
+        const adh = await api(`/dashboard/medication-adherence/${id}`).catch(() => null);
+        if (adh && Array.isArray(adh.medications)) setMedAdherence(adh);
+      } catch (e) {
+        // leave default empty state
       }
       setEditData(prev => ({ ...prev, documents: docs }));
       setPatientAdmissions(admissions);
@@ -848,6 +856,7 @@ const PatientDetail = () => {
       { key: 'symptom_report', label: 'Symptom report' },
       { key: 'chat',           label: 'Chat history' },
       { key: 'timeline',       label: 'Timeline' },
+      { key: 'medication',     label: 'Medication' },
     ];
 
     return (
@@ -1323,6 +1332,121 @@ const PatientDetail = () => {
             )}
           </div>
         )}
+
+        {/* Medication adherence */}
+        {monitoringSubTab === 'medication' && (() => {
+          const { medications: meds, logs, days: numDays } = medAdherence;
+          const todayStr = new Date().toISOString().slice(0, 10);
+          const dates = [];
+          for (let i = numDays - 1; i >= 0; i--) {
+            const d = new Date(); d.setDate(d.getDate() - i);
+            dates.push(d.toISOString().slice(0, 10));
+          }
+          const takenSet = new Set((logs || []).map(l => `${l.plan_id}-${l.med_index}-${l.slot}-${l.taken_date}`));
+
+          if (!meds || meds.length === 0) {
+            return (
+              <div style={{ padding: '28px 0', textAlign: 'center' }}>
+                <div style={{ fontSize: 13, color: '#94a3b8', fontWeight: 500 }}>No medication data available</div>
+                <div style={{ fontSize: 11, color: '#cbd5e1', marginTop: 6 }}>Add medications to this patient's treatment plan in the Management tab.</div>
+              </div>
+            );
+          }
+
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {/* Legend */}
+              <div style={{ display: 'flex', gap: 14, fontSize: 10, color: '#64748b', alignItems: 'center', flexWrap: 'wrap', padding: '6px 10px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                {[['#16a34a','Taken'],['#dc2626','Missed'],['#fbbf24','Today (pending)'],['#e2e8f0','Upcoming']].map(([bg, label]) => (
+                  <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <span style={{ width: 10, height: 10, borderRadius: 2, background: bg, display: 'inline-block', flexShrink: 0 }} />
+                    {label}
+                  </span>
+                ))}
+                <span style={{ marginLeft: 'auto', color: '#94a3b8', fontStyle: 'italic' }}>Last {numDays} days</span>
+              </div>
+
+              {meds.map((med, mi) => {
+                // Adherence % = taken / (past slots + today taken)
+                let totalSlots = 0, takenCount = 0;
+                dates.forEach(d => {
+                  (med.slots || []).forEach(slot => {
+                    const key = `${med.plan_id}-${med.med_index}-${slot}-${d}`;
+                    if (d <= todayStr) { totalSlots++; if (takenSet.has(key)) takenCount++; }
+                  });
+                });
+                const pct = totalSlots > 0 ? Math.round((takenCount / totalSlots) * 100) : null;
+                const pctColor = pct === null ? '#94a3b8' : pct >= 80 ? '#16a34a' : pct >= 50 ? '#f59e0b' : '#dc2626';
+
+                return (
+                  <div key={mi} style={{ borderRadius: 12, border: '1px solid #e2e8f0', background: '#fff', padding: '14px 16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>{med.name}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3, flexWrap: 'wrap' }}>
+                          {med.dosage && <span style={{ fontSize: 11, color: '#64748b' }}>{med.dosage}</span>}
+                          {med.food && (
+                            <span style={{ fontSize: 9, fontWeight: 700, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 6, padding: '1px 7px', color: '#16a34a' }}>
+                              {med.food === 'before' ? 'Before food' : med.food === 'after' ? 'After food' : med.food}
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: 9, color: '#94a3b8', marginTop: 3 }}>Plan: {med.plan_title}</div>
+                      </div>
+                      {pct !== null && (
+                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                          <div style={{ fontSize: 22, fontWeight: 800, color: pctColor, lineHeight: 1 }}>{pct}%</div>
+                          <div style={{ fontSize: 9, color: '#94a3b8', marginTop: 2 }}>adherence</div>
+                          <div style={{ fontSize: 9, color: '#cbd5e1' }}>{takenCount}/{totalSlots} doses</div>
+                        </div>
+                      )}
+                    </div>
+
+                    {(med.slots || []).length === 0 ? (
+                      <div style={{ fontSize: 11, color: '#94a3b8' }}>No reminder times set for this medication.</div>
+                    ) : (med.slots || []).map((slot, si) => {
+                      const slotLabel = slot === '08:00' ? 'Morning' : slot === '21:00' ? 'Night' : slot;
+                      return (
+                        <div key={si} style={{ marginTop: si > 0 ? 10 : 0 }}>
+                          <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#94a3b8', marginBottom: 5 }}>
+                            {slotLabel} · {slot}
+                          </div>
+                          <div style={{ display: 'flex', gap: 3, flexWrap: 'nowrap', overflowX: 'auto' }}>
+                            {dates.map((d, di) => {
+                              const key = `${med.plan_id}-${med.med_index}-${slot}-${d}`;
+                              const isTaken = takenSet.has(key);
+                              const isPast  = d < todayStr;
+                              const isToday = d === todayStr;
+                              const bg = isTaken ? '#16a34a' : isPast ? '#dc2626' : isToday ? '#fbbf24' : '#e2e8f0';
+                              const dayNum = new Date(d + 'T12:00:00').getDate();
+                              return (
+                                <div key={di} title={`${d}: ${isTaken ? 'Taken' : isPast ? 'Missed' : isToday ? 'Today' : 'Upcoming'}`}
+                                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+                                  <div style={{ width: 12, height: 12, borderRadius: 3, background: bg }} />
+                                  {(di === 0 || di === dates.length - 1 || dayNum === 1) && (
+                                    <div style={{ fontSize: 7, color: '#cbd5e1', fontFamily: "'DM Mono',monospace", whiteSpace: 'nowrap' }}>{dayNum}</div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 1 }}>
+                            <span style={{ fontSize: 8, color: '#cbd5e1', fontFamily: "'DM Mono',monospace" }}>{dates[0]}</span>
+                            <span style={{ fontSize: 8, color: '#cbd5e1', fontFamily: "'DM Mono',monospace" }}>{dates[dates.length - 1]}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+
+              <div style={{ fontSize: 10, color: '#94a3b8', textAlign: 'center', paddingTop: 2 }}>
+                Recorded when the patient marks doses as taken in the NeuroSight mobile app.
+              </div>
+            </div>
+          );
+        })()}
 
       </div>
     );

@@ -54,7 +54,7 @@ export default function Login() {
 
       const res = await fetch(
         `${API_BASE}${endpoint}`,
-        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+        { method: 'POST', headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': '1' }, body: JSON.stringify(body) }
       )
       if (!res.ok) {
         let message = tk.error

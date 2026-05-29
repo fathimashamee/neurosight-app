@@ -19,6 +19,7 @@ import Report from './screens/Report'
 import Education from './screens/Education'
 import Emergency from './screens/Emergency'
 import ReportSymptom from './screens/ReportSymptom'
+import MedicationReminder from './screens/MedicationReminder'
 
 /* Routes that show the bottom navigation bar */
 const NAV_ROUTES = new Set(['/home', '/checkin', '/chat', '/education', '/report'])
@@ -116,7 +117,8 @@ function AppShell() {
           <Route path="/result"    element={<Result />} />
           <Route path="/chat"      element={<Chat />} />
           <Route path="/symptom"   element={<ReportSymptom />} />
-          <Route path="/emergency" element={<Emergency />} />
+          <Route path="/emergency"             element={<Emergency />} />
+          <Route path="/medication-reminder"  element={<MedicationReminder />} />
         </Routes>
       </div>
 

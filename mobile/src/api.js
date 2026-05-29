@@ -5,7 +5,7 @@ export function getMobileToken() {
 }
 
 export async function api(path, { method = 'GET', body, isForm = false } = {}) {
-	const headers = {}
+	const headers = { 'ngrok-skip-browser-warning': '1' }
 	const token = getMobileToken()
 	if (token) headers.Authorization = `Bearer ${token}`
 	if (!isForm) headers['Content-Type'] = 'application/json'
