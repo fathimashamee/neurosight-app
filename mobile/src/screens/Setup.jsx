@@ -94,10 +94,10 @@ export default function Setup() {
   }
 
   // ── First-time wizard ────────────────────────────────────────────────────
-  const stepLabel = ['Daily Check-in', 'Notifications'][step - 1]
+  const stepLabel = [t('setup.step1Label'), t('setup.step2Label')][step - 1]
   const stepSub   = [
-    'Set the time for your daily health reminder',
-    'Allow NeuroSight to send you health reminders',
+    t('setup.step1Sub'),
+    t('setup.step2Sub'),
   ][step - 1]
 
   return (
@@ -130,20 +130,20 @@ export default function Setup() {
             </svg>
           </div>
           <div>
-            <div style={{ fontSize:9, fontWeight:700, letterSpacing:'0.16em', color:'rgba(255,255,255,0.5)', textTransform:'uppercase', lineHeight:1 }}>Account Ready</div>
+            <div style={{ fontSize:9, fontWeight:700, letterSpacing:'0.16em', color:'rgba(255,255,255,0.5)', textTransform:'uppercase', lineHeight:1 }}>{t('setup.accountReady')}</div>
             <div style={{ fontSize:11, color:'rgba(255,255,255,0.75)', fontWeight:500, marginTop:2 }}>NeuroSight Care</div>
           </div>
         </div>
 
         {/* Name + doctor */}
         <div style={{ textAlign:'center', animation:'fadeUp 0.35s ease 0.06s both' }}>
-          <p style={{ fontSize:13, color:'rgba(255,255,255,0.65)', margin:'0 0 3px', fontWeight:500 }}>Welcome,</p>
+          <p style={{ fontSize:13, color:'rgba(255,255,255,0.65)', margin:'0 0 3px', fontWeight:500 }}>{t('setup.welcome')}</p>
           <h1 style={{ fontSize:24, fontWeight:800, color:'#fff', margin:'0 0 14px', letterSpacing:'-0.3px', lineHeight:1.2 }}>
             {displayName || '—'}
           </h1>
           {patient.assigned_doctor && (
             <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:2, borderTop:'1px solid rgba(255,255,255,0.2)', paddingTop:11 }}>
-              <span style={{ fontSize:10, color:'rgba(255,255,255,0.5)', fontWeight:600, letterSpacing:'0.12em', textTransform:'uppercase' }}>Connected to</span>
+              <span style={{ fontSize:10, color:'rgba(255,255,255,0.5)', fontWeight:600, letterSpacing:'0.12em', textTransform:'uppercase' }}>{t('setup.connectedTo')}</span>
               <span style={{ fontSize:13, color:'#fff', fontWeight:700 }}>{patient.assigned_doctor}</span>
             </div>
           )}
@@ -153,7 +153,7 @@ export default function Setup() {
         <div style={{ marginTop:18 }}>
           <StepDots step={step} />
           <div style={{ textAlign:'center', fontSize:10, color:'rgba(255,255,255,0.45)', fontWeight:500 }}>
-            Step {step} of {TOTAL_STEPS}
+            {t('setup.stepOf', { step, total: TOTAL_STEPS })}
           </div>
         </div>
       </div>
@@ -176,7 +176,7 @@ export default function Setup() {
                   <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
                 </svg>
               </div>
-              <div style={{ fontSize:11, color:'#94a3b8', fontWeight:600, letterSpacing:'0.08em', textTransform:'uppercase', marginBottom:8 }}>Daily check-in time</div>
+              <div style={{ fontSize:11, color:'#94a3b8', fontWeight:600, letterSpacing:'0.08em', textTransform:'uppercase', marginBottom:8 }}>{t('setup.dailyCheckinTimeLabel')}</div>
 
               {showPicker ? (
                 <input
@@ -197,7 +197,7 @@ export default function Setup() {
               )}
 
               <div style={{ fontSize:11, color:'#94a3b8', marginTop:12, lineHeight:1.5 }}>
-                We'll remind you to complete your daily check-in at this time.
+                {t('setup.reminderHint')}
               </div>
             </div>
           </div>
@@ -213,27 +213,27 @@ export default function Setup() {
                   <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
                 </svg>
               </div>
-              <div style={{ fontSize:15, fontWeight:800, color:'#0f172a', marginBottom:6 }}>Stay on track</div>
+              <div style={{ fontSize:15, fontWeight:800, color:'#0f172a', marginBottom:6 }}>{t('setup.notifTitle')}</div>
               <div style={{ fontSize:12, color:'#64748b', lineHeight:1.6, marginBottom:18 }}>
-                Allow notifications so we can remind you about your daily check-in and any important updates from your care team.
+                {t('setup.notifFullText')}
               </div>
 
               {notifStatus === null && (
                 <button onClick={requestNotifications}
                   style={{ width:'100%', padding:'13px 0', background:'linear-gradient(135deg,#2563eb,#1d4ed8)', color:'#fff', border:'none', borderRadius:12, fontSize:14, fontWeight:700, cursor:'pointer', boxShadow:'0 4px 14px rgba(37,99,235,0.3)' }}>
-                  Allow Notifications
+                  {t('setup.allowNotifBtn')}
                 </button>
               )}
               {notifStatus === 'granted' && (
                 <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, background:'#f0fdf4', border:'1px solid #bbf7d0', borderRadius:12, padding:'13px 16px' }}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
-                  <span style={{ fontSize:13, color:'#15803d', fontWeight:700 }}>Notifications enabled</span>
+                  <span style={{ fontSize:13, color:'#15803d', fontWeight:700 }}>{t('setup.notifGranted')}</span>
                 </div>
               )}
               {notifStatus === 'denied' && (
                 <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, background:'#fef2f2', border:'1px solid #fecaca', borderRadius:12, padding:'13px 16px' }}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
-                  <span style={{ fontSize:13, color:'#dc2626', fontWeight:700 }}>Blocked in browser settings</span>
+                  <span style={{ fontSize:13, color:'#dc2626', fontWeight:700 }}>{t('setup.notifDeniedBrowser')}</span>
                 </div>
               )}
             </div>
@@ -257,14 +257,14 @@ export default function Setup() {
               letterSpacing:'0.01em', transition:'opacity 0.15s, transform 0.15s',
               opacity: saving ? 0.7 : 1,
             }}>
-            {saving ? 'Saving…' : step < TOTAL_STEPS ? 'Next →' : 'Get Started'}
+            {saving ? t('setup.saving') : step < TOTAL_STEPS ? t('setup.next') : t('setup.getStarted')}
           </button>
 
           <button
             className="skip-btn"
             onClick={skip}
             style={{ background:'none', border:'none', color:'#94a3b8', fontSize:13, fontWeight:600, cursor:'pointer', padding:'6px 0', transition:'opacity 0.15s' }}>
-            Skip for now — default reminder: {fmt24to12(DEFAULT_REMINDER)}
+            {t('setup.skipDefault', { time: fmt24to12(DEFAULT_REMINDER) })}
           </button>
         </div>
       </div>

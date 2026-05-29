@@ -12,6 +12,7 @@ from backend.models.admission import Admission
 from backend.models.chat_message import ChatMessage
 from backend.models.caretaker import Caretaker
 from backend.models.checkin import CheckIn
+from backend.models.medication_log import MedicationLog
 from backend.models.patient import Patient
 from backend.models.result import Result
 from backend.routers.treatment_plans import TreatmentPlan
@@ -369,6 +370,13 @@ class SymptomReportRequest(BaseModel):
     description: str | None = None
 
 
+class MedicationLogRequest(BaseModel):
+    plan_id:   int
+    med_index: int
+    slot:      str        # e.g. '08:00'
+    taken_date: str       # YYYY-MM-DD
+
+
 # ── endpoints ────────────────────────────────────────────────────────────────
 
 @router.post("/login")
@@ -683,7 +691,13 @@ def patient_report(
 ):
     patient, _role = auth
     latest_result = _latest_result(db, patient.id)
-    plans = _latest_treatment_plans(db, patient.id)
+    # Fetch all plans (not just latest 3) so the patient sees every care plan including older medication plans
+    plans = (
+        db.query(TreatmentPlan)
+        .filter(TreatmentPlan.patient_id == patient.id)
+        .order_by(TreatmentPlan.id.desc())
+        .all()
+    )
 
     scan = None
     if latest_result:
@@ -745,6 +759,37 @@ def update_mobile_patient(
         db.refresh(patient)
 
     return _patient_payload(patient)
+
+
+@router.post("/medication-log")
+def log_medication(
+    body: MedicationLogRequest,
+    auth: tuple[Patient, str] = Depends(get_mobile_patient),
+    db: Session = Depends(get_db),
+):
+    """Record that the patient has taken a medication dose. Idempotent."""
+    patient, _role = auth
+    existing = (
+        db.query(MedicationLog)
+        .filter(
+            MedicationLog.patient_id == patient.id,
+            MedicationLog.plan_id    == body.plan_id,
+            MedicationLog.med_index  == body.med_index,
+            MedicationLog.slot       == body.slot,
+            MedicationLog.taken_date == body.taken_date,
+        )
+        .first()
+    )
+    if not existing:
+        db.add(MedicationLog(
+            patient_id = patient.id,
+            plan_id    = body.plan_id,
+            med_index  = body.med_index,
+            slot       = body.slot,
+            taken_date = body.taken_date,
+        ))
+        db.commit()
+    return {"ok": True}
 
 
 @router.post("/chat", response_model=ChatResponse)

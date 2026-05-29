@@ -54,3 +54,4 @@ class Patient(Base):
     caretakers = relationship("Caretaker", back_populates="patient", cascade="all, delete-orphan")
     checkins = relationship("CheckIn", back_populates="patient", cascade="all, delete-orphan", order_by="CheckIn.id.desc()")
     chat_messages = relationship("ChatMessage", back_populates="patient", cascade="all, delete-orphan", order_by="ChatMessage.id.desc()")
+    medication_logs = relationship("MedicationLog", back_populates="patient", cascade="all, delete-orphan", order_by="MedicationLog.id.desc()")

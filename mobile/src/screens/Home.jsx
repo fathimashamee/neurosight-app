@@ -42,8 +42,8 @@ export default function Home() {
   const reminderTime = localStorage.getItem('reminder_time') || '20:00'
   const currentLang  = localStorage.getItem('language') || 'en'
 
-  function fmtTime(t) {
-    const [h, m] = t.split(':').map(Number)
+  function fmtTime(time) {
+    const [h, m] = time.split(':').map(Number)
     const p = h >= 12 ? 'PM' : 'AM'
     return `${h % 12 || 12}:${m.toString().padStart(2, '0')} ${p}`
   }
@@ -52,7 +52,6 @@ export default function Home() {
     try { return JSON.parse(localStorage.getItem('mobile_latest_checkin') || 'null') } catch { return null }
   })
 
-  // ── Report / diagnosis-confirmed notification ──────────────────────────────
   const [reportData, setReportData] = useState(() => {
     try { return JSON.parse(localStorage.getItem('mobile_report') || 'null') } catch { return null }
   })
@@ -81,7 +80,6 @@ export default function Home() {
     }
   }, [])
 
-  // Fetch report in background to detect doctor-confirmed notification
   useEffect(() => {
     api('/mobile/report')
       .then(d => {
@@ -107,80 +105,126 @@ export default function Home() {
   }
 
   const actions = [
-    { key: 'report',    icon: ReportIcon,    route: '/report',    color: '#eff6ff', iconColor: '#1d4ed8', border: '#bfdbfe' },
-    { key: 'checkin',   icon: CheckinIcon,   route: '/checkin',   color: '#f0fdf4', iconColor: '#16a34a', border: '#bbf7d0' },
-    { key: 'chat',      icon: ChatIcon,      route: '/chat',      color: '#fdf4ff', iconColor: '#9333ea', border: '#f3e8ff' },
-    { key: 'education', icon: EducationIcon, route: '/education', color: '#fff7ed', iconColor: '#ea580c', border: '#fed7aa' },
-    { key: 'symptom',   icon: SymptomIcon,   route: '/symptom',   color: '#fef2f2', iconColor: '#be185d', border: '#fecdd3' },
-    { key: 'emergency', icon: EmergencyIcon, route: '/emergency', color: '#fff1f2', iconColor: '#e11d48', border: '#fecdd3' },
+    { key: 'report',    icon: ReportIcon,    route: '/report',    cardBg: '#eff6ff', iconGrad: 'linear-gradient(135deg,#60a5fa,#1d4ed8)', border: '#bfdbfe', shadow: '#1d4ed833' },
+    { key: 'checkin',   icon: CheckinIcon,   route: '/checkin',   cardBg: '#f0fdf4', iconGrad: 'linear-gradient(135deg,#4ade80,#16a34a)', border: '#bbf7d0', shadow: '#16a34a33' },
+    { key: 'chat',      icon: ChatIcon,      route: '/chat',      cardBg: '#fdf4ff', iconGrad: 'linear-gradient(135deg,#c084fc,#9333ea)', border: '#f3e8ff', shadow: '#9333ea33' },
+    { key: 'education', icon: EducationIcon, route: '/education', cardBg: '#fff7ed', iconGrad: 'linear-gradient(135deg,#fb923c,#ea580c)', border: '#fed7aa', shadow: '#ea580c33' },
+    { key: 'symptom',   icon: SymptomIcon,   route: '/symptom',   cardBg: '#fef2f2', iconGrad: 'linear-gradient(135deg,#f472b6,#be185d)', border: '#fecdd3', shadow: '#be185d33' },
+    { key: 'emergency', icon: EmergencyIcon, route: '/emergency', cardBg: '#fff1f2', iconGrad: 'linear-gradient(135deg,#fb7185,#e11d48)', border: '#fecdd3', shadow: '#e11d4833' },
   ]
 
   const ls = checkin ? levelStyle(checkin.level) : null
+  const displayName = isCaretaker ? (caretaker.name || '') : (patient.name || '')
+  const initials = displayName.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase() || '?'
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: "'DM Sans', sans-serif", display: 'flex', flexDirection: 'column' }}>
+    <div style={{ minHeight: '100vh', background: 'linear-gradient(180deg,#f0fdfa 0%,#f8fafc 35%)', fontFamily: "'DM Sans', sans-serif", display: 'flex', flexDirection: 'column' }}>
       <style>{`
-        @keyframes fadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
-        .action-card { transition: transform 0.15s ease; }
-        .action-card:active { transform: scale(0.95); }
-        .lang-btn:active { opacity: 0.75; }
+        @keyframes fadeUp    { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes cardPop   { from{opacity:0;transform:scale(0.93) translateY(10px)} to{opacity:1;transform:scale(1) translateY(0)} }
+        @keyframes float     { 0%,100%{transform:translateY(0px)} 50%{transform:translateY(-14px)} }
+        @keyframes floatSlow { 0%,100%{transform:translateY(0) rotate(0deg)} 50%{transform:translateY(-8px) rotate(6deg)} }
+        @keyframes pulseRing { 0%{transform:scale(0.8);opacity:0.8} 100%{transform:scale(2.8);opacity:0} }
+        @keyframes shimmer   { 0%{background-position:-200% center} 100%{background-position:200% center} }
+        @keyframes spin      { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+        .action-card {
+          transition: transform 0.2s cubic-bezier(.34,1.56,.64,1), box-shadow 0.2s ease;
+          cursor: pointer;
+        }
+        .action-card:hover  { transform: translateY(-3px) !important; }
+        .action-card:active { transform: scale(0.93) !important; box-shadow: none !important; }
+        .lang-btn { transition: opacity 0.15s, background 0.15s; }
+        .lang-btn:active { opacity: 0.65; }
+        .med-card { transition: transform 0.18s ease, box-shadow 0.18s ease; cursor: pointer; }
+        .med-card:hover  { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(109,40,217,0.45) !important; }
+        .med-card:active { transform: scale(0.97); }
+        .sign-out-btn { transition: color 0.15s; }
+        .sign-out-btn:hover { color: #ef4444 !important; }
       `}</style>
 
       {/* ── Header ─────────────────────────────────────────────────── */}
-      <div style={{ background: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)', padding: '48px 20px 24px', position: 'relative', overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', top: -30, right: -30, width: 130, height: 130, borderRadius: '50%', background: 'rgba(255,255,255,0.07)', pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', bottom: -20, left: -20, width: 90, height: 90, borderRadius: '50%', background: 'rgba(255,255,255,0.05)', pointerEvents: 'none' }} />
+      <div style={{ background: 'linear-gradient(135deg,#0d9488 0%,#0f766e 52%,#134e4a 100%)', padding: '52px 20px 28px', position: 'relative', overflow: 'hidden' }}>
 
-        {/* Top row: name + language toggle */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
-          <div style={{ animation: 'fadeUp 0.4s ease both' }}>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', marginBottom: 2 }}>{getGreeting(t)}</div>
-            <div style={{ fontSize: 21, fontWeight: 800, color: '#fff', lineHeight: 1.2 }}>
-              {isCaretaker ? (caretaker.name || '—') : (patient.name || '—')}
+        {/* Animated orbs */}
+        <div style={{ position:'absolute', top:-45, right:-45, width:170, height:170, borderRadius:'50%', background:'rgba(255,255,255,0.07)', animation:'float 7s ease-in-out infinite', pointerEvents:'none' }} />
+        <div style={{ position:'absolute', bottom:-32, left:-28, width:120, height:120, borderRadius:'50%', background:'rgba(255,255,255,0.05)', animation:'float 9s ease-in-out infinite 2.5s', pointerEvents:'none' }} />
+        <div style={{ position:'absolute', top:55, right:55, width:65, height:65, borderRadius:'50%', background:'rgba(255,255,255,0.06)', animation:'floatSlow 5.5s ease-in-out infinite 1s', pointerEvents:'none' }} />
+
+        {/* Subtle brain watermark */}
+        <div style={{ position:'absolute', bottom:8, right:16, opacity:0.06, pointerEvents:'none' }}>
+          <svg width="86" height="86" viewBox="0 0 24 24" fill="white">
+            <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.44-4.16zm5 0a2.5 2.5 0 0 1 1.44 4.16 2.5 2.5 0 0 1 1.32 4.24 3 3 0 0 1-.34 5.58 2.5 2.5 0 0 1-2.96 3.08A2.5 2.5 0 0 1 12 19.5v-15A2.5 2.5 0 0 1 14.5 2z"/>
+          </svg>
+        </div>
+
+        {/* Brand logo row */}
+        <div style={{ display:'flex', alignItems:'center', gap:9, marginBottom:18, animation:'fadeUp 0.35s ease both' }}>
+          <div style={{ width:34, height:34, borderRadius:10, background:'rgba(255,255,255,0.18)', border:'1px solid rgba(255,255,255,0.3)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, backdropFilter:'blur(10px)', boxShadow:'0 2px 10px rgba(0,0,0,0.12)' }}>
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.6" strokeLinecap="round">
+              <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.46 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z"/>
+              <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.46 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z"/>
+            </svg>
+          </div>
+          <span style={{ fontSize:12, fontWeight:800, color:'rgba(255,255,255,0.88)', letterSpacing:'0.2em', textTransform:'uppercase' }}>
+            NeuroSight
+          </span>
+        </div>
+
+        {/* Top row */}
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:16 }}>
+
+          {/* Avatar + name */}
+          <div style={{ display:'flex', alignItems:'center', gap:12, animation:'fadeUp 0.4s ease both' }}>
+            <div style={{ width:46, height:46, borderRadius:15, background:'rgba(255,255,255,0.18)', border:'1.5px solid rgba(255,255,255,0.32)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, backdropFilter:'blur(8px)' }}>
+              <span style={{ fontSize:17, fontWeight:800, color:'#fff', letterSpacing:'-0.01em' }}>{initials}</span>
             </div>
-            {isCaretaker && (
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.65)', marginTop: 4 }}>
-                {t('home.caretakerViewing')} <span style={{ fontWeight: 700 }}>{patient.name || '—'}</span>
+            <div>
+              <div style={{ fontSize:11.5, color:'rgba(255,255,255,0.62)', marginBottom:2, letterSpacing:'0.01em' }}>{getGreeting(t)}</div>
+              <div style={{ fontSize:20, fontWeight:800, color:'#fff', lineHeight:1.15, letterSpacing:'-0.02em' }}>
+                {displayName || '—'}
               </div>
-            )}
+              {isCaretaker && (
+                <div style={{ fontSize:10.5, color:'rgba(255,255,255,0.58)', marginTop:3 }}>
+                  {t('home.caretakerViewing')} <span style={{ fontWeight:700, color:'rgba(255,255,255,0.85)' }}>{patient.name || '—'}</span>
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Right controls: language + settings */}
-          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-            <button
-              className="lang-btn"
-              onClick={cycleLang}
-              style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.28)', borderRadius: 10, color: 'rgba(255,255,255,0.92)', padding: '6px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, letterSpacing: '0.04em' }}>
+          {/* Controls */}
+          <div style={{ display:'flex', gap:6, flexShrink:0 }}>
+            <button className="lang-btn" onClick={cycleLang} style={{ background:'rgba(255,255,255,0.15)', border:'1px solid rgba(255,255,255,0.28)', borderRadius:10, color:'rgba(255,255,255,0.92)', padding:'6px 10px', fontSize:11, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', gap:5, letterSpacing:'0.04em', backdropFilter:'blur(8px)' }}>
               <GlobeIcon />
               {LANG_LABEL[currentLang]}
             </button>
-            <button
-              className="lang-btn"
-              onClick={() => navigate('/setup')}
-              title="Settings"
-              style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.28)', borderRadius: 10, color: 'rgba(255,255,255,0.92)', padding: '6px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <button className="lang-btn" onClick={() => navigate('/setup')} title="Settings" style={{ background:'rgba(255,255,255,0.15)', border:'1px solid rgba(255,255,255,0.28)', borderRadius:10, color:'rgba(255,255,255,0.92)', padding:'6px 10px', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(8px)' }}>
               <GearIcon />
             </button>
           </div>
         </div>
 
-        {/* Info pills */}
-        <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', animation: 'fadeUp 0.4s ease 0.08s both' }}>
-          <div style={{ background: tc.bg, borderRadius: 20, padding: '4px 11px', fontSize: 11, color: tc.text, fontWeight: 700 }}>
+        {/* Pills row */}
+        <div style={{ display:'flex', gap:7, flexWrap:'wrap', animation:'fadeUp 0.4s ease 0.1s both' }}>
+          <div style={{ background:tc.bg, borderRadius:20, padding:'4px 12px', fontSize:11, color:tc.text, fontWeight:700 }}>
             {patient.tumour_type || t('home.notClassified')}
           </div>
           {patient.risk_score && patient.risk_score !== '0%' && (
-            <div style={{ background: 'rgba(255,255,255,0.15)', borderRadius: 20, padding: '4px 11px', fontSize: 11, color: '#fff', fontWeight: 700 }}>
+            <div style={{ background:'rgba(255,255,255,0.15)', borderRadius:20, padding:'4px 12px', fontSize:11, color:'#fff', fontWeight:700 }}>
               {t('home.riskScore')}: {patient.risk_score}
+            </div>
+          )}
+          {patient.hospital_id && (
+            <div style={{ background:'rgba(255,255,255,0.1)', borderRadius:20, padding:'4px 12px', fontSize:11, color:'rgba(255,255,255,0.65)', fontWeight:600 }}>
+              {patient.hospital_id}
             </div>
           )}
         </div>
       </div>
 
-      {/* ── Body ───────────────────────────────────────────────────── */}
-      <div style={{ flex: 1, padding: '14px 14px 82px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {/* ── Body ────────────────────────────────────────────────────── */}
+      <div style={{ flex:1, padding:'14px 14px 90px', display:'flex', flexDirection:'column', gap:13 }}>
 
-        {/* ── Diagnosis confirmed notification banner ────────────── */}
+        {/* Diagnosis confirmed notification */}
         {showNotif && (
           <DiagnosisNotifBanner
             reportData={reportData}
@@ -191,130 +235,177 @@ export default function Home() {
           />
         )}
 
-        {/* Setup reminder banner */}
+        {/* Setup banner */}
         {!setupDone && (
-          <div style={{ background: setupSkipped ? '#fff7ed' : '#fffbeb', border: `1.5px solid ${setupSkipped ? '#fed7aa' : '#fde68a'}`, borderRadius: 14, padding: '13px 14px', display: 'flex', alignItems: 'center', gap: 11, animation: 'fadeUp 0.4s ease both' }}>
-            <div style={{ width: 32, height: 32, borderRadius: 9, background: setupSkipped ? '#ffedd5' : '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <div style={{ background:setupSkipped ? '#fff7ed' : '#fffbeb', border:`1.5px solid ${setupSkipped ? '#fed7aa' : '#fde68a'}`, borderRadius:16, padding:'13px 14px', display:'flex', alignItems:'center', gap:11, animation:'cardPop 0.4s ease both', boxShadow:`0 3px 12px ${setupSkipped ? '#f97316' : '#f59e0b'}22` }}>
+            <div style={{ width:34, height:34, borderRadius:10, background:setupSkipped ? '#ffedd5' : '#fef3c7', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={setupSkipped ? '#ea580c' : '#d97706'} strokeWidth="2.2" strokeLinecap="round">
                 <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
               </svg>
             </div>
-            <div style={{ flex: 1 }}>
+            <div style={{ flex:1 }}>
               {setupSkipped ? (
                 <>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#9a3412', marginBottom: 1 }}>Setup skipped</div>
-                  <div style={{ fontSize: 11, color: '#c2410c', lineHeight: 1.4 }}>
-                    Default check-in reminder: <strong>{fmtTime(reminderTime)}</strong> tap to customise
-                  </div>
+                  <div style={{ fontSize:12, fontWeight:700, color:'#9a3412', marginBottom:1 }}>{t('home.setupSkipped')}</div>
+                  <div style={{ fontSize:11, color:'#c2410c', lineHeight:1.4 }}>{t('home.setupSkippedSub', { time:fmtTime(reminderTime) })}</div>
                 </>
               ) : (
                 <>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#92400e', marginBottom: 1 }}>{t('home.setupBanner')}</div>
-                  <div style={{ fontSize: 11, color: '#b45309', lineHeight: 1.4 }}>{t('home.setupBannerSub')}</div>
+                  <div style={{ fontSize:12, fontWeight:700, color:'#92400e', marginBottom:1 }}>{t('home.setupBanner')}</div>
+                  <div style={{ fontSize:11, color:'#b45309', lineHeight:1.4 }}>{t('home.setupBannerSub')}</div>
                 </>
               )}
             </div>
-            <button onClick={() => navigate('/setup')} style={{ background: setupSkipped ? '#ea580c' : '#d97706', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
-              {setupSkipped ? 'Set up' : t('home.setupBannerBtn')}
+            <button onClick={() => navigate('/setup')} style={{ background:setupSkipped ? '#ea580c' : '#d97706', color:'#fff', border:'none', borderRadius:9, padding:'7px 11px', fontSize:11, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap', flexShrink:0, boxShadow:'0 2px 8px rgba(0,0,0,0.15)' }}>
+              {setupSkipped ? t('home.setupBtn') : t('home.setupBannerBtn')}
             </button>
           </div>
         )}
 
         {/* Last check-in card */}
-        <div style={{ background: '#fff', border: `1.5px solid ${ls ? ls.border : '#e2e8f0'}`, borderRadius: 14, padding: '13px 14px', animation: 'fadeUp 0.4s ease 0.08s both', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-            <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#94a3b8', marginBottom: 6 }}>
+        <div style={{ background:'#fff', border:`1.5px solid ${ls ? ls.border : '#e2e8f0'}`, borderRadius:18, padding:'16px 16px', animation:'cardPop 0.45s cubic-bezier(.34,1.56,.64,1) 0.06s both', boxShadow:`0 2px 14px ${ls ? ls.dot + '22' : 'rgba(0,0,0,0.05)'}` }}>
+          <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:11 }}>
+            <div style={{ fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.12em', color:'#94a3b8' }}>
               {t('home.lastCheckin')}
             </div>
+          </div>
+          <div style={{ display:'flex', flexDirection:'column', alignItems:'center', textAlign:'center' }}>
             {checkin ? (
               <>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                  <div style={{ width: 9, height: 9, borderRadius: '50%', background: ls.dot, flexShrink: 0 }} />
-                  <span style={{ fontSize: 14, fontWeight: 800, color: ls.color }}>{checkin.level}</span>
-                  <span style={{ fontSize: 11, color: '#94a3b8' }}>· {t('home.checkinScore')} {checkin.score}</span>
+                {/* Pulsing status dot */}
+                <div style={{ position:'relative', display:'inline-flex', alignItems:'center', justifyContent:'center', width:28, height:28, marginBottom:9 }}>
+                  <div style={{ position:'absolute', width:16, height:16, borderRadius:'50%', background:ls.dot + '35', animation:'pulseRing 2s ease-out infinite' }} />
+                  <div style={{ position:'absolute', width:16, height:16, borderRadius:'50%', background:ls.dot + '20', animation:'pulseRing 2s ease-out infinite 0.75s' }} />
+                  <div style={{ width:13, height:13, borderRadius:'50%', background:ls.dot, boxShadow:`0 0 7px ${ls.dot}99`, position:'relative', zIndex:1 }} />
+                </div>
+
+                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:3 }}>
+                  <span style={{ fontSize:15, fontWeight:800, color:ls.color }}>{checkin.level}</span>
+                  <div style={{ width:1, height:13, background:'#e2e8f0' }} />
+                  <span style={{ fontSize:11, color:'#94a3b8' }}>{t('home.checkinScore')} {checkin.score}</span>
                 </div>
                 {checkin.created_at && (
-                  <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 3 }}>
+                  <div style={{ fontSize:10, color:'#cbd5e1', marginBottom:11 }}>
                     {new Date(checkin.created_at).toLocaleDateString()}
                   </div>
                 )}
                 <button
-                  onClick={() => navigate('/result', { state: checkin })}
-                  style={{ background: ls.bg, border: `1px solid ${ls.border}`, color: ls.color, borderRadius: 9, padding: '6px 11px', fontSize: 11, fontWeight: 700, cursor: 'pointer', marginTop: 8 }}>
+                  onClick={() => navigate('/result', { state:checkin })}
+                  style={{ background:ls.bg, border:`1.5px solid ${ls.border}`, color:ls.color, borderRadius:10, padding:'7px 18px', fontSize:11, fontWeight:700, cursor:'pointer', display:'inline-flex', alignItems:'center', gap:5, transition:'opacity 0.15s' }}>
                   {t('home.viewDetails')}
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={ls.color} strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
                 </button>
               </>
             ) : (
-              <div style={{ fontSize: 12, color: '#94a3b8', lineHeight: 1.5 }}>{t('home.noCheckin')}</div>
+              <div style={{ fontSize:12, color:'#94a3b8', lineHeight:1.5, padding:'4px 0' }}>{t('home.noCheckin')}</div>
             )}
           </div>
         </div>
 
-        {/* Quick actions — 2 × 3 grid */}
-        <div style={{ animation: 'fadeUp 0.4s ease 0.12s both' }}>
-          <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#94a3b8', marginBottom: 9 }}>
+        {/* Quick actions grid */}
+        <div style={{ animation:'fadeUp 0.4s ease 0.12s both' }}>
+          <div style={{ fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.12em', color:'#94a3b8', marginBottom:10, paddingLeft:2 }}>
             {t('home.quickActions')}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            {actions.map(({ key, icon: Icon, route, color, iconColor, border }) => (
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+            {actions.map(({ key, icon:Icon, route, cardBg, iconGrad, border, shadow }, i) => (
               <button
                 key={key}
                 className="action-card"
                 onClick={() => navigate(route)}
                 style={{
-                  background: color, border: `1px solid ${border}`,
-                  borderRadius: 14, padding: '15px 13px',
-                  display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 9,
-                  cursor: 'pointer', textAlign: 'left',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                  background: cardBg,
+                  border: `1.5px solid ${border}`,
+                  borderRadius: 16,
+                  padding: '15px 13px',
+                  display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 10,
+                  textAlign: 'left',
+                  boxShadow: `0 2px 8px ${shadow}`,
                   position: 'relative',
+                  animation: `cardPop 0.4s cubic-bezier(.34,1.56,.64,1) ${0.08 + i * 0.04}s both`,
                 }}>
-                {/* NEW dot badge on Report card when unread confirmed notification */}
                 {key === 'report' && showNotif && (
                   <div style={{ position:'absolute', top:10, right:10, width:9, height:9, borderRadius:'50%', background:'#ef4444', boxShadow:'0 0 0 2px #fff' }} />
                 )}
-                <div style={{ width: 33, height: 33, borderRadius: 9, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-                  <Icon color={iconColor} />
+                <div style={{ width:38, height:38, borderRadius:11, background:iconGrad, display:'flex', alignItems:'center', justifyContent:'center', boxShadow:`0 3px 10px ${shadow}` }}>
+                  <Icon color="#fff" />
                 </div>
                 <div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#1e293b', marginBottom: 2 }}>{t(`home.${key}`)}</div>
-                  <div style={{ fontSize: 10, color: '#64748b', lineHeight: 1.4 }}>{t(`home.${key}Sub`)}</div>
+                  <div style={{ fontSize:12, fontWeight:700, color:'#1e293b', marginBottom:2 }}>{t(`home.${key}`)}</div>
+                  <div style={{ fontSize:10.5, color:'#64748b', lineHeight:1.4 }}>{t(`home.${key}Sub`)}</div>
                 </div>
               </button>
             ))}
           </div>
         </div>
 
+        {/* Medication Reminder - Coming Soon */}
+        <button
+          className="med-card"
+          onClick={() => navigate('/medication-reminder')}
+          style={{
+            background: 'linear-gradient(135deg,#4c1d95 0%,#6d28d9 55%,#7c3aed 100%)',
+            border: 'none',
+            borderRadius: 18,
+            padding: '16px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 14,
+            textAlign: 'left',
+            boxShadow: '0 5px 22px rgba(109,40,217,0.38)',
+            position: 'relative',
+            overflow: 'hidden',
+            animation: 'fadeUp 0.4s ease 0.33s both',
+          }}>
+          {/* Decorative orbs */}
+          <div style={{ position:'absolute', top:-22, right:-22, width:95, height:95, borderRadius:'50%', background:'rgba(255,255,255,0.08)', pointerEvents:'none' }} />
+          <div style={{ position:'absolute', bottom:-14, right:56, width:54, height:54, borderRadius:'50%', background:'rgba(255,255,255,0.05)', pointerEvents:'none' }} />
+          <div style={{ position:'absolute', top:16, right:80, width:30, height:30, borderRadius:'50%', background:'rgba(255,255,255,0.06)', pointerEvents:'none' }} />
+
+          {/* Pill icon container */}
+          <div style={{ width:46, height:46, borderRadius:14, background:'rgba(255,255,255,0.18)', border:'1.5px solid rgba(255,255,255,0.28)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, backdropFilter:'blur(8px)' }}>
+            <PillIcon />
+          </div>
+
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ marginBottom:4 }}>
+              <span style={{ fontSize:13, fontWeight:800, color:'#fff', letterSpacing:'-0.01em' }}>{t('home.medication')}</span>
+            </div>
+            <div style={{ fontSize:11, color:'rgba(255,255,255,0.72)', lineHeight:1.5 }}>{t('home.medicationSub')}</div>
+          </div>
+
+          <div style={{ flexShrink:0, opacity:0.55 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+          </div>
+        </button>
+
         {/* Doctor card */}
-        <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: '13px 14px', display: 'flex', alignItems: 'center', gap: 12, animation: 'fadeUp 0.4s ease 0.18s both', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
-          <div style={{ width: 38, height: 38, borderRadius: 10, background: '#f0fdfa', border: '1px solid #ccfbf1', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#0d9488" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <div style={{ background:'#fff', border:'1.5px solid #e2e8f0', borderRadius:16, padding:'13px 14px', display:'flex', alignItems:'center', gap:12, animation:'fadeUp 0.4s ease 0.38s both', boxShadow:'0 2px 8px rgba(0,0,0,0.04)' }}>
+          <div style={{ width:40, height:40, borderRadius:12, background:'linear-gradient(135deg,#f0fdfa,#ccfbf1)', border:'1.5px solid #99f6e4', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#0d9488" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
               <circle cx="12" cy="7" r="4"/>
             </svg>
           </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#94a3b8', marginBottom: 2 }}>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', color:'#94a3b8', marginBottom:2 }}>
               {t('home.yourDoctor')}
             </div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>{patient.assigned_doctor || t('home.noDoctor')}</div>
+            <div style={{ fontSize:13, fontWeight:700, color:'#1e293b' }}>{patient.assigned_doctor || t('home.noDoctor')}</div>
           </div>
           {patient.monitoring_frequency && !['No reminder', 'Reminder not configured'].includes(patient.monitoring_frequency) && (
-            <div style={{ background: '#f0fdfa', border: '1px solid #99f6e4', borderRadius: 8, padding: '4px 8px', flexShrink: 0 }}>
-              <div style={{ fontSize: 10, color: '#0d9488', fontWeight: 600 }}>{patient.monitoring_frequency}</div>
+            <div style={{ background:'#f0fdfa', border:'1px solid #99f6e4', borderRadius:9, padding:'4px 9px', flexShrink:0 }}>
+              <div style={{ fontSize:10, color:'#0d9488', fontWeight:600 }}>{patient.monitoring_frequency}</div>
             </div>
           )}
         </div>
 
-        {/* Sign out — small footer link, not a prominent button */}
-        <div style={{ textAlign: 'center', paddingTop: 2 }}>
-          <button
-            onClick={signOut}
-            style={{ background: 'none', border: 'none', color: '#cbd5e1', fontSize: 11, cursor: 'pointer', padding: '4px 8px', textDecoration: 'underline', textDecorationColor: '#e2e8f0' }}>
+        {/* Sign out */}
+        <div style={{ textAlign:'center', paddingTop:2 }}>
+          <button className="sign-out-btn" onClick={signOut} style={{ background:'none', border:'none', color:'#cbd5e1', fontSize:11, cursor:'pointer', padding:'4px 8px' }}>
             {t('home.signOut')}
           </button>
         </div>
-
       </div>
     </div>
   )
@@ -324,41 +415,40 @@ export default function Home() {
 
 const NOTIF_STR = {
   en: {
-    badge:    'NEW · DIAGNOSIS CONFIRMED',
-    title:    'Your diagnosis has been confirmed',
-    sub:      'Your doctor has reviewed your MRI and confirmed your diagnosis. Tap to view your full medical report.',
-    btn:      'View Report',
+    badge: 'NEW · DIAGNOSIS CONFIRMED',
+    title: 'Your diagnosis has been confirmed',
+    sub:   'Your doctor has reviewed your MRI and confirmed your diagnosis. Tap to view your full medical report.',
+    btn:   'View Report',
   },
   si: {
-    badge:    'නව · රෝග විනිශ්චය තහවුරු විය',
-    title:    'ඔබේ රෝග විනිශ්චය තහවුරු කර ඇත',
-    sub:      'ඔබේ වෛද්‍යවරයා ඔබේ MRI සමාලෝචනය කර රෝග විනිශ්චය තහවුරු කළේය. සම්පූර්ණ වෛද්‍ය වාර්තාව බැලීමට ස්පර්ශ කරන්න.',
-    btn:      'වාර්තාව බලන්න',
+    badge: 'නව · රෝග විනිශ්චය තහවුරු විය',
+    title: 'ඔබේ රෝග විනිශ්චය තහවුරු කර ඇත',
+    sub:   'ඔබේ වෛද්‍යවරයා ඔබේ MRI සමාලෝචනය කර රෝග විනිශ්චය තහවුරු කළේය. සම්පූර්ණ වෛද්‍ය වාර්තාව බැලීමට ස්පර්ශ කරන්න.',
+    btn:   'වාර්තාව බලන්න',
   },
   ta: {
-    badge:    'புதிய · நோய் கண்டறிதல் உறுதி',
-    title:    'உங்கள் நோய் கண்டறிதல் உறுதிப்படுத்தப்பட்டது',
-    sub:      'உங்கள் மருத்துவர் உங்கள் MRI ஐ மதிப்பாய்வு செய்து நோயை உறுதிப்படுத்தினார். முழு மருத்துவ அறிக்கையை பார்க்க தட்டுங்கள்.',
-    btn:      'அறிக்கை பாருங்கள்',
+    badge: 'புதிய · நோய் கண்டறிதல் உறுதி',
+    title: 'உங்கள் நோய் கண்டறிதல் உறுதிப்படுத்தப்பட்டது',
+    sub:   'உங்கள் மருத்துவர் உங்கள் MRI ஐ மதிப்பாய்வு செய்து நோயை உறுதிப்படுத்தினார். முழு மருத்துவ அறிக்கையை பார்க்க தட்டுங்கள்.',
+    btn:   'அறிக்கை பாருங்கள்',
   },
 }
 
 function DiagnosisNotifBanner({ reportData, lang, navigate, onDismiss, onOpen }) {
-  const n      = NOTIF_STR[lang] || NOTIF_STR.en
-  const scan   = reportData?.scan
-  const label  = scan?.final_label || ''
+  const n     = NOTIF_STR[lang] || NOTIF_STR.en
+  const scan  = reportData?.scan
+  const label = scan?.final_label || ''
 
-  // pick accent colour from the confirmed condition
   const ACCENT_MAP = {
-    glioma:      '#2563eb',
-    meningioma:  '#9333ea',
-    pituitary:   '#ea580c',
-    no_tumor:    '#16a34a',
+    glioma:     '#2563eb',
+    meningioma: '#9333ea',
+    pituitary:  '#ea580c',
+    no_tumor:   '#16a34a',
   }
   let accent = '#0d9488'
   const lo = label.toLowerCase()
-  if (lo.includes('glioma') || lo.includes('gbm'))      accent = ACCENT_MAP.glioma
-  else if (lo.includes('meningioma'))                   accent = ACCENT_MAP.meningioma
+  if (lo.includes('glioma') || lo.includes('gbm'))             accent = ACCENT_MAP.glioma
+  else if (lo.includes('meningioma'))                          accent = ACCENT_MAP.meningioma
   else if (lo.includes('pituitary') || lo.includes('adenoma')) accent = ACCENT_MAP.pituitary
   else if (lo.includes('no tumor') || lo.includes('no tumour')) accent = ACCENT_MAP.no_tumor
 
@@ -366,23 +456,19 @@ function DiagnosisNotifBanner({ reportData, lang, navigate, onDismiss, onOpen })
     <div
       onClick={onOpen}
       style={{
-        background:   `linear-gradient(135deg, ${accent}f0, ${accent}cc)`,
-        borderRadius: 16,
-        padding:      '14px 14px 14px 14px',
+        background:   `linear-gradient(135deg,${accent}f0,${accent}cc)`,
+        borderRadius: 18,
+        padding:      '14px 14px',
         cursor:       'pointer',
         animation:    'fadeUp 0.4s ease both',
         position:     'relative',
         overflow:     'hidden',
-        boxShadow:    `0 4px 16px ${accent}44`,
-      }}
-    >
-      {/* Decorative circle */}
+        boxShadow:    `0 5px 20px ${accent}44`,
+      }}>
       <div style={{ position:'absolute', top:-20, right:-20, width:90, height:90, borderRadius:'50%', background:'rgba(255,255,255,0.1)', pointerEvents:'none' }} />
 
-      {/* Badge row */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
         <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-          {/* Bell icon */}
           <div style={{ width:26, height:26, borderRadius:8, background:'rgba(255,255,255,0.22)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round">
               <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
@@ -393,35 +479,27 @@ function DiagnosisNotifBanner({ reportData, lang, navigate, onDismiss, onOpen })
             {n.badge}
           </span>
         </div>
-        {/* Dismiss × */}
         <button
           onClick={e => { e.stopPropagation(); onDismiss() }}
-          style={{ background:'rgba(255,255,255,0.18)', border:'none', borderRadius:6, width:24, height:24, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', color:'#fff', fontSize:13, lineHeight:1, flexShrink:0 }}
-        >
+          style={{ background:'rgba(255,255,255,0.18)', border:'none', borderRadius:6, width:24, height:24, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', color:'#fff', fontSize:13, lineHeight:1, flexShrink:0 }}>
           ×
         </button>
       </div>
 
-      {/* Title */}
       <div style={{ fontSize:14, fontWeight:800, color:'#fff', lineHeight:1.3, marginBottom:5 }}>{n.title}</div>
-
-      {/* Subtitle */}
       <div style={{ fontSize:11.5, color:'rgba(255,255,255,0.88)', lineHeight:1.6, marginBottom:12 }}>{n.sub}</div>
 
-      {/* CTA button */}
       <div style={{ display:'flex', justifyContent:'flex-end' }}>
         <div style={{ background:'rgba(255,255,255,0.22)', border:'1px solid rgba(255,255,255,0.35)', borderRadius:9, padding:'7px 14px', display:'inline-flex', alignItems:'center', gap:5 }}>
           <span style={{ fontSize:12, fontWeight:700, color:'#fff' }}>{n.btn}</span>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round">
-            <polyline points="9 18 15 12 9 6"/>
-          </svg>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
         </div>
       </div>
     </div>
   )
 }
 
-// ── Icons ─────────────────────────────────────────────────────────────────────
+// ── Icons ──────────────────────────────────────────────────────────────────────
 
 function GlobeIcon() {
   return (
@@ -493,6 +571,15 @@ function EmergencyIcon({ color }) {
       <polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/>
       <line x1="12" y1="8" x2="12" y2="12"/>
       <line x1="12" y1="16" x2="12.01" y2="16"/>
+    </svg>
+  )
+}
+
+function PillIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.95)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="8" width="18" height="8" rx="4" ry="4"/>
+      <line x1="12" y1="8" x2="12" y2="16"/>
     </svg>
   )
 }
