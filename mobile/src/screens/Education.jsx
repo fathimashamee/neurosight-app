@@ -288,8 +288,9 @@ export default function Education() {
   let patient = null;
   try { patient = JSON.parse(localStorage.getItem('mobile_patient') || 'null'); } catch {}
   const tumourType = patient?.tumour_type || patient?.tumor_type || '';
-  const profileKey = getProfileKey(tumourType);
-  const profile    = PROFILES[profileKey] || PROFILES.no_tumor;
+  const noAnalysis = !tumourType || tumourType.toLowerCase() === 'not classified';
+  const profileKey = noAnalysis ? null : getProfileKey(tumourType);
+  const profile    = (profileKey && PROFILES[profileKey]) || PROFILES.no_tumor;
   const { meta }   = profile;
   const tabs        = TAB_LABELS[lang];
   const content     = profile[lang] || profile.en;
@@ -309,8 +310,40 @@ export default function Education() {
     contentRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  const conditionName = meta.name[lang] || meta.name.en;
+  const conditionName = noAnalysis ? '' : (meta.name[lang] || meta.name.en);
   const TabIconComp   = TAB_ICON_FNS[activeTab];
+
+  const NO_ANALYSIS_TEXT = {
+    en: { title: 'No MRI Analysis Yet', body: 'Your personalised education content will appear here once your MRI scan has been analysed and a diagnosis has been made. Please check back after your results are available.' },
+    si: { title: 'MRI විශ්ලේෂණයක් නොමැත', body: 'ඔබේ MRI ස්කෑනය විශ්ලේෂණය කර රෝග විනිශ්චය ලැබීමෙන් පසු ඔබේ පුද්ගලිකෘත අධ්‍යාපන අන්තර්ගතය මෙහි දිස්වනු ඇත. ප්‍රතිඵල ලැබීමෙන් පසු නැවත පරීක්ෂා කරන්න.' },
+    ta: { title: 'MRI பகுப்பாய்வு இல்லை', body: 'உங்கள் MRI ஸ்கேன் பகுப்பாய்வு செய்யப்பட்டு நோய் கண்டறியப்பட்ட பிறகு உங்கள் தனிப்பயனாக்கப்பட்ட கல்வி உள்ளடக்கம் இங்கே தோன்றும். உங்கள் முடிவுகள் கிடைத்த பிறகு மீண்டும் சரிபாருங்கள்.' },
+  };
+
+  if (noAnalysis) {
+    const txt = NO_ANALYSIS_TEXT[lang] || NO_ANALYSIS_TEXT.en;
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: '#f8fafc', fontFamily: "'DM Sans', sans-serif" }}>
+        <div style={{ flexShrink: 0, backgroundColor: '#fff', boxShadow: '0 1px 0 #e2e8f0', position: 'relative' }}>
+          <BackButton variant="solid" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px 12px 100px' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ fontSize: '10px', fontWeight: 600, color: '#94a3b8', letterSpacing: '0.8px', textTransform: 'uppercase', margin: '0 0 2px' }}>Patient Education</p>
+              <h1 style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a', margin: 0 }}>{txt.title}</h1>
+            </div>
+          </div>
+        </div>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px', gap: 20 }}>
+          <div style={{ width: 72, height: 72, borderRadius: 20, backgroundColor: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Icons.info size={32} color="#94a3b8" />
+          </div>
+          <div style={{ textAlign: 'center', maxWidth: 340 }}>
+            <h2 style={{ fontSize: '17px', fontWeight: 700, color: '#1e293b', margin: '0 0 10px' }}>{txt.title}</h2>
+            <p style={{ fontSize: '14px', color: '#64748b', lineHeight: 1.7, margin: 0 }}>{txt.body}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const DISCLAIMER = {
     en: (name) => <>Information personalised to your diagnosis of <strong style={{ color: '#475569', fontWeight: 600 }}>{name}</strong>. Always follow your doctor's advice and attend all scheduled appointments.</>,
