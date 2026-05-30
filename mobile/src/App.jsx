@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { api } from './api'
 import BottomNav  from './screens/BottomNav'
 import BackButton from './screens/BackButton'
@@ -20,9 +20,18 @@ import Education from './screens/Education'
 import Emergency from './screens/Emergency'
 import ReportSymptom from './screens/ReportSymptom'
 import MedicationReminder from './screens/MedicationReminder'
+import ReminderBanner from './screens/ReminderBanner'
 
 /* Routes that show the bottom navigation bar */
 const NAV_ROUTES = new Set(['/home', '/checkin', '/chat', '/education', '/report'])
+
+/* Redirect already-logged-in users away from auth screens — only on device, not localhost demo */
+function AuthRedirect({ element }) {
+  if (localStorage.getItem('mobile_token') && window.location.hostname !== 'localhost') {
+    return <Navigate to="/home" replace />
+  }
+  return element
+}
 
 function ComingSoon({ title }) {
   const navigate = useNavigate()
@@ -90,7 +99,7 @@ function AppShell() {
   const showNav      = NAV_ROUTES.has(pathname)
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', position: 'relative' }}>
 
       {/* ── Scrollable content area ── */}
       <div
@@ -106,9 +115,9 @@ function AppShell() {
       >
         <EnrollmentHandler />
         <Routes>
-          <Route path="/"          element={<Welcome />} />
-          <Route path="/language"  element={<LanguageSelect />} />
-          <Route path="/login"     element={<Login />} />
+          <Route path="/"          element={<AuthRedirect element={<Welcome />} />} />
+          <Route path="/language"  element={<AuthRedirect element={<LanguageSelect />} />} />
+          <Route path="/login"     element={<AuthRedirect element={<Login />} />} />
           <Route path="/setup"     element={<Setup />} />
           <Route path="/home"      element={<Home />} />
           <Route path="/report"    element={<Report />} />
@@ -124,6 +133,9 @@ function AppShell() {
 
       {/* ── Bottom nav bar (main screens only) ── */}
       {showNav && <BottomNav />}
+
+      {/* ── In-app reminder banners (check-in + medication) ── */}
+      <ReminderBanner />
 
     </div>
   )

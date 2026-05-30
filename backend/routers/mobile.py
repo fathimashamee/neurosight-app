@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import re
 
 from fastapi import APIRouter, Depends, HTTPException, status, Header
@@ -13,6 +13,7 @@ from backend.models.chat_message import ChatMessage
 from backend.models.caretaker import Caretaker
 from backend.models.checkin import CheckIn
 from backend.models.medication_log import MedicationLog
+from backend.models.enrollment import Enrollment
 from backend.models.patient import Patient
 from backend.models.result import Result
 from backend.routers.treatment_plans import TreatmentPlan
@@ -40,6 +41,7 @@ def _patient_payload(patient: Patient) -> dict:
         "risk_score":      patient.risk_score or "0%",
         "assigned_doctor": patient.clinician.name if patient.clinician else None,
         "monitoring_frequency": _monitoring_frequency(patient.tumour_type),
+        "next_visit_date": patient.next_visit_date,
     }
 
 
@@ -293,6 +295,7 @@ def get_mobile_patient(
 
 class PatientLoginRequest(BaseModel):
     hospital_id: str
+    language: str | None = None
 
 class CaretakerLoginRequest(BaseModel):
     hospital_id: str
@@ -391,6 +394,20 @@ def patient_login(body: PatientLoginRequest, db: Session = Depends(get_db)):
     patient = query.first()
     if not patient:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Patient not found")
+
+    enrollment = db.query(Enrollment).filter(Enrollment.patient_id == patient.id).first()
+    if enrollment:
+        changed = False
+        if not enrollment.first_login_at:
+            enrollment.first_login_at = datetime.now(timezone.utc)
+            if enrollment.status == "sent":
+                enrollment.status = "active"
+            changed = True
+        if body.language and body.language in ("en", "si", "ta"):
+            enrollment.preferred_language = body.language
+            changed = True
+        if changed:
+            db.commit()
 
     return {
         "token":   _create_mobile_token(patient.id, "patient"),
@@ -629,6 +646,31 @@ def notify_clinician(
     return {"notified": True, "id": chat.id, "message": "Clinician notified (dev)"}
 
 
+class PreferencesRequest(BaseModel):
+    language: str
+    reminder_time: str | None = None
+
+
+@router.post("/language")
+def save_preferences(
+    body: PreferencesRequest,
+    auth: tuple[Patient, str] = Depends(get_mobile_patient),
+    db: Session = Depends(get_db),
+):
+    patient, _role = auth
+    lang = body.language.strip()
+    if lang not in ("en", "si", "ta"):
+        return {"ok": False}
+    enrollment = db.query(Enrollment).filter(Enrollment.patient_id == patient.id).first()
+    if enrollment:
+        enrollment.preferred_language = lang
+        enrollment.last_active_at = datetime.now(timezone.utc)
+        if body.reminder_time:
+            enrollment.reminder_time = body.reminder_time
+        db.commit()
+    return {"ok": True}
+
+
 @router.post("/symptom-report")
 def report_symptom(
     body: SymptomReportRequest,
@@ -690,6 +732,10 @@ def patient_report(
     db: Session = Depends(get_db),
 ):
     patient, _role = auth
+    enrollment = db.query(Enrollment).filter(Enrollment.patient_id == patient.id).first()
+    if enrollment:
+        enrollment.last_active_at = datetime.now(timezone.utc)
+        db.commit()
     latest_result = _latest_result(db, patient.id)
     # Fetch all plans (not just latest 3) so the patient sees every care plan including older medication plans
     plans = (

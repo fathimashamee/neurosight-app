@@ -43,8 +43,9 @@ class Patient(Base):
     scan_report = Column(String(200)) # Added by Nirojini
     
     # Dates
-    joined_date = Column(String(50)) 
+    joined_date = Column(String(50))
     discharge_date = Column(String(50), default="Pending")
+    next_visit_date = Column(String(50), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now()) # Added by Nirojini
     

@@ -73,6 +73,19 @@ const icons = {
 
 const SYMPTOM_TYPES = ['headache','dizziness','nausea','vision','fatigue','memory','speech','tingling','other']
 
+// English labels sent to the backend (display uses t() for translations)
+const SYMPTOM_EN_LABELS = {
+  headache:  'Headache',
+  dizziness: 'Dizziness',
+  nausea:    'Nausea',
+  vision:    'Vision changes',
+  fatigue:   'Fatigue',
+  memory:    'Memory / Confusion',
+  speech:    'Speech difficulty',
+  tingling:  'Tingling / Numbness',
+  other:     'Other',
+}
+
 const MAX_CHARS = 300
 
 /* ── Component ──────────────────────────────────────────────────────────────── */
@@ -108,7 +121,7 @@ export default function ReportSymptom() {
     setError('')
     setLoading(true)
     try {
-      const typeLabel = selectedTypes.map(k => t(`symptom.types.${k}`)).join(', ')
+      const typeLabel = selectedTypes.map(k => SYMPTOM_EN_LABELS[k]).join(', ')
       await api('/mobile/symptom-report', {
         method: 'POST',
         body: { symptom_type: typeLabel, description: description.trim() || null },
@@ -213,7 +226,7 @@ export default function ReportSymptom() {
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2.2" strokeLinecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
             </div>
             <div>
-              <div style={{ fontSize: 11, fontWeight: 800, color: '#b45309', marginBottom: 1 }}>For urgent / life-threatening symptoms</div>
+              <div style={{ fontSize: 11, fontWeight: 800, color: '#b45309', marginBottom: 1 }}>{t('symptom.hintUrgentLabel')}</div>
               <div style={{ fontSize: 11, color: '#92400e' }}>{t('symptom.hintEmergency')}</div>
             </div>
           </div>
@@ -222,7 +235,7 @@ export default function ReportSymptom() {
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
             </div>
             <div>
-              <div style={{ fontSize: 11, fontWeight: 800, color: '#1d4ed8', marginBottom: 1 }}>For your regular daily symptoms</div>
+              <div style={{ fontSize: 11, fontWeight: 800, color: '#1d4ed8', marginBottom: 1 }}>{t('symptom.hintDailyLabel')}</div>
               <div style={{ fontSize: 11, color: '#1e40af' }}>{t('symptom.hintCheckin')}</div>
             </div>
           </div>
@@ -236,7 +249,7 @@ export default function ReportSymptom() {
               <div style={{ width: 4, height: 20, borderRadius: 2, background: '#0d9488' }} />
               <div>
                 <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>{t('symptom.selectType')}</div>
-                <div style={{ fontSize: 10.5, color: '#64748b', marginTop: 1 }}>Select all that apply</div>
+                <div style={{ fontSize: 10.5, color: '#64748b', marginTop: 1 }}>{t('symptom.selectAllThat')}</div>
               </div>
             </div>
             {selectedTypes.length > 0 ? (
@@ -244,10 +257,10 @@ export default function ReportSymptom() {
                 <div style={{ width: 22, height: 22, borderRadius: '50%', background: '#0d9488', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <span style={{ fontSize: 11, fontWeight: 900, color: '#fff' }}>{selectedTypes.length}</span>
                 </div>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#0f766e' }}>selected</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#0f766e' }}>{t('symptom.selectedCount')}</span>
               </div>
             ) : (
-              <span style={{ fontSize: 10.5, color: '#94a3b8', fontStyle: 'italic' }}>None yet</span>
+              <span style={{ fontSize: 10.5, color: '#94a3b8', fontStyle: 'italic' }}>{t('symptom.noneYet')}</span>
             )}
           </div>
 
@@ -390,7 +403,7 @@ export default function ReportSymptom() {
 
         {!canSubmit && (
           <div style={{ marginTop: 10, textAlign: 'center', fontSize: 11.5, color: '#94a3b8' }}>
-            Select at least one symptom to continue
+            {t('symptom.selectAtLeastOne')}
           </div>
         )}
       </div>

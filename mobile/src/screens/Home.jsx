@@ -89,6 +89,11 @@ export default function Home() {
       .catch(() => {})
   }, [])
 
+  useEffect(() => {
+    api('/mobile/language', { method: 'POST', body: { language: currentLang, reminder_time: localStorage.getItem('reminder_time') || '20:00' } })
+      .catch(() => {})
+  }, [currentLang])
+
   function cycleLang() {
     const next = LANG_CYCLE[(LANG_CYCLE.indexOf(currentLang) + 1) % LANG_CYCLE.length]
     localStorage.setItem('language', next)
@@ -263,43 +268,43 @@ export default function Home() {
         )}
 
         {/* Last check-in card */}
-        <div style={{ background:'#fff', border:`1.5px solid ${ls ? ls.border : '#e2e8f0'}`, borderRadius:18, padding:'16px 16px', animation:'cardPop 0.45s cubic-bezier(.34,1.56,.64,1) 0.06s both', boxShadow:`0 2px 14px ${ls ? ls.dot + '22' : 'rgba(0,0,0,0.05)'}` }}>
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:6, marginBottom:11 }}>
+        <div style={{ background: ls ? `linear-gradient(150deg,#fff 55%,${ls.bg} 100%)` : '#fff', border:`1.5px solid ${ls ? ls.border : '#e2e8f0'}`, borderRadius:18, padding:'14px 14px', animation:'cardPop 0.45s cubic-bezier(.34,1.56,.64,1) 0.06s both', boxShadow:`0 4px 20px ${ls ? ls.dot + '28' : 'rgba(0,0,0,0.06)'}` }}>
+          {/* Header row */}
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
             <div style={{ fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.12em', color:'#94a3b8' }}>
               {t('home.lastCheckin')}
             </div>
-          </div>
-          <div style={{ display:'flex', flexDirection:'column', alignItems:'center', textAlign:'center' }}>
-            {checkin ? (
-              <>
-                {/* Pulsing status dot */}
-                <div style={{ position:'relative', display:'inline-flex', alignItems:'center', justifyContent:'center', width:28, height:28, marginBottom:9 }}>
-                  <div style={{ position:'absolute', width:16, height:16, borderRadius:'50%', background:ls.dot + '35', animation:'pulseRing 2s ease-out infinite' }} />
-                  <div style={{ position:'absolute', width:16, height:16, borderRadius:'50%', background:ls.dot + '20', animation:'pulseRing 2s ease-out infinite 0.75s' }} />
-                  <div style={{ width:13, height:13, borderRadius:'50%', background:ls.dot, boxShadow:`0 0 7px ${ls.dot}99`, position:'relative', zIndex:1 }} />
-                </div>
-
-                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:3 }}>
-                  <span style={{ fontSize:15, fontWeight:800, color:ls.color }}>{checkin.level}</span>
-                  <div style={{ width:1, height:13, background:'#e2e8f0' }} />
-                  <span style={{ fontSize:11, color:'#94a3b8' }}>{t('home.checkinScore')} {checkin.score}</span>
-                </div>
-                {checkin.created_at && (
-                  <div style={{ fontSize:10, color:'#cbd5e1', marginBottom:11 }}>
-                    {new Date(checkin.created_at).toLocaleDateString()}
-                  </div>
-                )}
-                <button
-                  onClick={() => navigate('/result', { state:checkin })}
-                  style={{ background:ls.bg, border:`1.5px solid ${ls.border}`, color:ls.color, borderRadius:10, padding:'7px 18px', fontSize:11, fontWeight:700, cursor:'pointer', display:'inline-flex', alignItems:'center', gap:5, transition:'opacity 0.15s' }}>
-                  {t('home.viewDetails')}
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={ls.color} strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
-                </button>
-              </>
-            ) : (
-              <div style={{ fontSize:12, color:'#94a3b8', lineHeight:1.5, padding:'4px 0' }}>{t('home.noCheckin')}</div>
+            {checkin?.created_at && (
+              <div style={{ fontSize:10, color:'#cbd5e1', fontWeight:500 }}>
+                {new Date(checkin.created_at).toLocaleDateString()}
+              </div>
             )}
           </div>
+
+          {checkin ? (
+            <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+              {/* Solid level badge */}
+              <div style={{ background:ls.color, borderRadius:14, padding:'10px 14px', display:'flex', flexDirection:'column', alignItems:'center', gap:2, flexShrink:0, minWidth:88, boxShadow:`0 4px 14px ${ls.dot}55` }}>
+                <span style={{ fontSize:14, fontWeight:900, color:'#fff', letterSpacing:'0.02em' }}>{checkin.level}</span>
+                <span style={{ fontSize:10, color:'rgba(255,255,255,0.78)', fontWeight:600 }}>{t('home.checkinScore')} {checkin.score}</span>
+              </div>
+
+              {/* Hint + CTA */}
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:11.5, color:'#475569', lineHeight:1.55, marginBottom:10 }}>
+                  {{ CRITICAL: t('home.checkinHintCritical'), RED: t('home.checkinHintRed'), AMBER: t('home.checkinHintAmber'), GREEN: t('home.checkinHintGreen') }[checkin.level] || ''}
+                </div>
+                <button
+                  onClick={() => navigate('/result', { state:checkin })}
+                  style={{ background:ls.color, border:'none', color:'#fff', borderRadius:9, padding:'8px 14px', fontSize:11, fontWeight:700, cursor:'pointer', display:'inline-flex', alignItems:'center', gap:5, boxShadow:`0 3px 10px ${ls.dot}44` }}>
+                  {t('home.viewDetails')}
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ fontSize:12, color:'#94a3b8', lineHeight:1.5, padding:'4px 0', textAlign:'center' }}>{t('home.noCheckin')}</div>
+          )}
         </div>
 
         {/* Quick actions grid */}
@@ -380,25 +385,38 @@ export default function Home() {
         </button>
 
         {/* Doctor card */}
-        <div style={{ background:'#fff', border:'1.5px solid #e2e8f0', borderRadius:16, padding:'13px 14px', display:'flex', alignItems:'center', gap:12, animation:'fadeUp 0.4s ease 0.38s both', boxShadow:'0 2px 8px rgba(0,0,0,0.04)' }}>
-          <div style={{ width:40, height:40, borderRadius:12, background:'linear-gradient(135deg,#f0fdfa,#ccfbf1)', border:'1.5px solid #99f6e4', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#0d9488" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-              <circle cx="12" cy="7" r="4"/>
-            </svg>
-          </div>
-          <div style={{ flex:1 }}>
-            <div style={{ fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', color:'#94a3b8', marginBottom:2 }}>
-              {t('home.yourDoctor')}
+        {(() => {
+          const nextVisit = reportData?.patient?.next_visit_date || patient.next_visit_date
+          return (
+            <div style={{ background:'#fff', border:'1.5px solid #e2e8f0', borderRadius:16, padding:'13px 14px', display:'flex', alignItems:'center', gap:12, animation:'fadeUp 0.4s ease 0.38s both', boxShadow:'0 2px 8px rgba(0,0,0,0.04)' }}>
+              <div style={{ width:40, height:40, borderRadius:12, background:'linear-gradient(135deg,#f0fdfa,#ccfbf1)', border:'1.5px solid #99f6e4', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#0d9488" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                  <circle cx="12" cy="7" r="4"/>
+                </svg>
+              </div>
+              <div style={{ flex:1, textAlign:'center' }}>
+                <div style={{ fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', color:'#94a3b8', marginBottom:2 }}>
+                  {t('home.yourDoctor')}
+                </div>
+                <div style={{ fontSize:13, fontWeight:700, color:'#1e293b' }}>{patient.assigned_doctor || t('home.noDoctor')}</div>
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:5, marginTop:5 }}>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={nextVisit ? '#0d9488' : '#cbd5e1'} strokeWidth="2" strokeLinecap="round">
+                    <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                  </svg>
+                  <span style={{ fontSize:11, color: nextVisit ? '#0d9488' : '#94a3b8', fontWeight: nextVisit ? 600 : 400 }}>
+                    {nextVisit ? `${t('home.nextVisit')}: ${nextVisit}` : t('home.noNextVisit')}
+                  </span>
+                </div>
+              </div>
+              {patient.monitoring_frequency && !['No reminder', 'Reminder not configured'].includes(patient.monitoring_frequency) && (
+                <div style={{ background:'#f0fdfa', border:'1px solid #99f6e4', borderRadius:9, padding:'4px 9px', flexShrink:0 }}>
+                  <div style={{ fontSize:10, color:'#0d9488', fontWeight:600 }}>{patient.monitoring_frequency}</div>
+                </div>
+              )}
             </div>
-            <div style={{ fontSize:13, fontWeight:700, color:'#1e293b' }}>{patient.assigned_doctor || t('home.noDoctor')}</div>
-          </div>
-          {patient.monitoring_frequency && !['No reminder', 'Reminder not configured'].includes(patient.monitoring_frequency) && (
-            <div style={{ background:'#f0fdfa', border:'1px solid #99f6e4', borderRadius:9, padding:'4px 9px', flexShrink:0 }}>
-              <div style={{ fontSize:10, color:'#0d9488', fontWeight:600 }}>{patient.monitoring_frequency}</div>
-            </div>
-          )}
-        </div>
+          )
+        })()}
 
         {/* Sign out */}
         <div style={{ textAlign:'center', paddingTop:2 }}>
