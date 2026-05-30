@@ -165,6 +165,7 @@ const PatientDetail = () => {
   const [editingPlan, setEditingPlan] = useState(null);
   const [chainInfoId, setChainInfoId] = useState(null);
   const [expandedCheckin, setExpandedCheckin] = useState(null);
+  const [calWeeksBack, setCalWeeksBack] = useState(0);
   const [monitoringSubTab, setMonitoringSubTab] = useState('checkin');
   const [monitoringCheckins, setMonitoringCheckins] = useState([]);
   const [planSaving, setPlanSaving] = useState(false);
@@ -179,9 +180,12 @@ const PatientDetail = () => {
   const [enrolling, setEnrolling] = useState(false);
   const [enrollResult, setEnrollResult] = useState(null);
   const [medAdherence, setMedAdherence] = useState({ medications: [], logs: [], days: 30, since: '' });
+  const [medOffsets, setMedOffsets] = useState({});
   const [linkCopied, setLinkCopied] = useState(false);
   const [newCaretaker, setNewCaretaker] = useState({ name: '', phone: '', relation: '' });
   const [caretakerSaving, setCaretakerSaving] = useState(false);
+  const [editingNextVisit, setEditingNextVisit] = useState(false);
+  const [nextVisitInput, setNextVisitInput] = useState('');
   const [newPlanForm, setNewPlanForm] = useState({
     plan_date: new Date().toISOString().slice(0, 10),
     plan_type: 'Medication', title: '', medications: '',
@@ -289,6 +293,16 @@ const PatientDetail = () => {
 
   const handleEditChange = (e) => {
     setEditData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  const saveNextVisitDate = async () => {
+    try {
+      await api(`/patients/${patient.id}`, { method: 'PUT', body: { next_visit_date: nextVisitInput || null } });
+      setPatient(prev => ({ ...prev, next_visit_date: nextVisitInput || null }));
+      setEditingNextVisit(false);
+    } catch (e) {
+      console.error('Failed to save next visit date', e);
+    }
   };
 
   const handleNewAdmission = async () => {
@@ -467,7 +481,7 @@ const PatientDetail = () => {
   );
 
   const hTa = (fieldName, placeholder, rows = 3) => {
-    const canEdit = isClinical;
+    const canEdit = isClinical && pageMode === 'edit';
     return (
       <textarea
         name={fieldName} rows={rows}
@@ -544,9 +558,9 @@ const PatientDetail = () => {
           </div>
         </div>
       )}
-      <ExamSection label="Examination Findings" hint="General appearance, vital signs, HEENT, chest, abdomen, CNS findings…" fieldName="examinationFindings" canEdit={isClinical} value={editData.examinationFindings || ''} onChange={handleEditChange} />
-      <ExamSection label="Muscle Power" hint="Upper / lower limb grading (MRC scale 0–5) — proximal & distal groups" fieldName="musclePower" canEdit={isClinical} value={editData.musclePower || ''} onChange={handleEditChange} />
-      <ExamSection label="Reflex" hint="Deep tendon reflexes (biceps, triceps, knee, ankle) — graded 0–4+; plantar response" fieldName="reflex" canEdit={isClinical} value={editData.reflex || ''} onChange={handleEditChange} />
+      <ExamSection label="Examination Findings" hint="General appearance, vital signs, HEENT, chest, abdomen, CNS findings…" fieldName="examinationFindings" canEdit={isClinical && pageMode === 'edit'} value={editData.examinationFindings || ''} onChange={handleEditChange} />
+      <ExamSection label="Muscle Power" hint="Upper / lower limb grading (MRC scale 0–5) — proximal & distal groups" fieldName="musclePower" canEdit={isClinical && pageMode === 'edit'} value={editData.musclePower || ''} onChange={handleEditChange} />
+      <ExamSection label="Reflex" hint="Deep tendon reflexes (biceps, triceps, knee, ankle) — graded 0–4+; plantar response" fieldName="reflex" canEdit={isClinical && pageMode === 'edit'} value={editData.reflex || ''} onChange={handleEditChange} />
     </div>
   );
 
@@ -812,6 +826,8 @@ const PatientDetail = () => {
         id: c.id,
         date,
         time,
+        _dt: dt,
+        _dateKey: dt ? `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}` : null,
         score: c.score,
         level: c.level || (c.emergency ? 'CRITICAL' : 'GREEN'),
         headache: c.headache,
@@ -850,13 +866,72 @@ const PatientDetail = () => {
     }));
     const levelMeta = l => ({ CRITICAL: { bg: '#4c0519', text: '#fff', label: 'CRITICAL' }, RED: { bg: '#dc2626', text: '#fff', label: 'RED' }, AMBER: { bg: '#f59e0b', text: '#fff', label: 'AMBER' }, GREEN: { bg: '#16a34a', text: '#fff', label: 'GREEN' } }[l] || { bg: '#94a3b8', text: '#fff', label: l });
 
+    const _fmtKey = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const _byDateKey = {};
+    checkins.forEach(c => { if (c._dateKey) { (_byDateKey[c._dateKey] = _byDateKey[c._dateKey] || []).push(c); } });
+    const _levelOrder = ['GREEN','AMBER','RED','CRITICAL'];
+    const _worstLevel = cks => { let w = -1; cks.forEach(c => { const idx = _levelOrder.indexOf((c.level||'').toUpperCase()); if (idx > w) w = idx; }); return w >= 0 ? _levelOrder[w] : 'GREEN'; };
+    const _enrollDt = enrollmentStatus?.enrolled_at ? new Date(enrollmentStatus.enrolled_at) : null;
+    const _firstCkDt = checkins.length > 0 && checkins[checkins.length-1]?._dt ? checkins[checkins.length-1]._dt : null;
+    const _trackStart = _enrollDt || _firstCkDt;
+    const _todayMid = new Date(); _todayMid.setHours(0, 0, 0, 0);
+    const _todayDow = _todayMid.getDay();
+    const _thisWeekSun = new Date(_todayMid);
+    _thisWeekSun.setDate(_todayMid.getDate() + (_todayDow === 0 ? 0 : 7 - _todayDow));
+    const _calEnd = new Date(_thisWeekSun);
+    _calEnd.setDate(_thisWeekSun.getDate() - calWeeksBack * 7);
+    const _calStart = new Date(_calEnd);
+    _calStart.setDate(_calEnd.getDate() - 27);
+    const _canGoForward = calWeeksBack > 0;
+    const _calCells = (() => {
+      const cells = [];
+      const cur = new Date(_calStart);
+      for (let i = 0; i < 28; i++) {
+        const k = _fmtKey(cur);
+        const dayCks = _byDateKey[k] || [];
+        let st = 'outside';
+        if (cur > _todayMid) {
+          st = 'future';
+        } else if (_trackStart) {
+          const tsm = new Date(_trackStart); tsm.setHours(0, 0, 0, 0);
+          if (cur >= tsm) st = dayCks.length > 0 ? _worstLevel(dayCks) : 'MISSED';
+        } else if (dayCks.length > 0) {
+          st = _worstLevel(dayCks);
+        }
+        cells.push({ d: new Date(cur), key: k, dayCks, status: st });
+        cur.setDate(cur.getDate() + 1);
+      }
+      return cells;
+    })();
+    const _missedCount = _calCells.filter(c => c.status === 'MISSED').length;
+    const _fullLog = (() => {
+      const missed = [];
+      if (_trackStart) {
+        const tsm = new Date(_trackStart); tsm.setHours(0, 0, 0, 0);
+        const yest = new Date(_todayMid); yest.setDate(_todayMid.getDate() - 1);
+        const cur = new Date(yest);
+        while (cur >= tsm) {
+          const k = _fmtKey(cur);
+          if (!_byDateKey[k]) missed.push({ _type: 'missed', _dateKey: k, date: cur.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' }) });
+          cur.setDate(cur.getDate() - 1);
+        }
+      }
+      return [...checkins.map(c => ({ ...c, _type: 'checkin' })), ...missed]
+        .sort((a, b) => {
+          if (!a._dateKey || !b._dateKey) return 0;
+          if (b._dateKey !== a._dateKey) return b._dateKey.localeCompare(a._dateKey);
+          if (a._type === 'missed') return 1;
+          if (b._type === 'missed') return -1;
+          return ((b._dt || 0) - (a._dt || 0));
+        });
+    })();
+
     const MON_TABS = [
       { key: 'checkin',        label: 'Check-in history' },
       { key: 'emergency',      label: 'Emergency' },
       { key: 'symptom_report', label: 'Symptom report' },
-      { key: 'chat',           label: 'Chat history' },
-      { key: 'timeline',       label: 'Timeline' },
       { key: 'medication',     label: 'Medication' },
+      { key: 'chat',           label: 'Chat history' },
     ];
 
     return (
@@ -871,8 +946,8 @@ const PatientDetail = () => {
               </div>
               <div>
                 <div style={{ fontSize: 12, fontWeight: 700, color: '#1e40af' }}>{patient?.name || 'Patient'} — Monitoring</div>
-                <div style={{ fontSize: 10, color: '#3b82f6', marginTop: 2 }}>Code: <strong style={{ fontFamily: "'DM Mono',monospace" }}>{patient?.hospitalId || patient?.hospital_id || '—'}</strong> · Live check-ins · Reminder 8:00 PM</div>
-                <div style={{ fontSize: 10, color: '#3b82f6', marginTop: 1 }}>Last active: {lastActive} · Check-ins: {daysWithCheckins} day{daysWithCheckins === 1 ? '' : 's'}</div>
+                <div style={{ fontSize: 10, color: '#3b82f6', marginTop: 2 }}>Code: <strong style={{ fontFamily: "'DM Mono',monospace" }}>{patient?.hospitalId || patient?.hospital_id || '—'}</strong> · Live check-ins · {enrollmentStatus?.reminder_time ? `Reminder ${(() => { const [h, m] = (enrollmentStatus.reminder_time).split(':').map(Number); const p = h >= 12 ? 'PM' : 'AM'; return `${h % 12 || 12}:${String(m).padStart(2,'0')} ${p}`; })()}` : 'Reminder not set'}</div>
+                <div style={{ fontSize: 10, color: '#3b82f6', marginTop: 1 }}>Last active: {enrollmentStatus?.last_active_at ? new Date(enrollmentStatus.last_active_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : lastActive} · Check-ins: {daysWithCheckins} day{daysWithCheckins === 1 ? '' : 's'}</div>
               </div>
             </div>
             {/* Enroll / status button — Doctor, Clinician, Super Admin, Assistant */}
@@ -944,18 +1019,49 @@ const PatientDetail = () => {
 
         {/* Next visit + App usage */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <div style={{ borderRadius: 10, border: '1px solid #e2e8f0', background: '#fff', padding: '10px 14px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>Next visit</span>
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#0f172a', fontFamily: "'DM Mono',monospace" }}>20 May 2026</span>
-            </div>
-          </div>
+          {(() => {
+            const activeAdm = patientAdmissions.find(a => a.status === 'Active');
+            return (
+              <div style={{ borderRadius: 10, border: `1px solid ${activeAdm ? '#bbf7d0' : '#e2e8f0'}`, background: activeAdm ? '#f0fdf4' : '#fff', padding: '10px 14px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 11, color: activeAdm ? '#15803d' : '#64748b', fontWeight: 500 }}>{activeAdm ? 'In hospital' : 'Next visit'}</span>
+                  {activeAdm ? (
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#15803d', fontFamily: "'DM Mono',monospace" }}>
+                      since {activeAdm.admission_date || '—'}
+                    </span>
+                  ) : editingNextVisit ? (
+                    <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                      <input
+                        type="date"
+                        value={nextVisitInput}
+                        onChange={e => setNextVisitInput(e.target.value)}
+                        style={{ fontSize: 10, border: '1px solid #cbd5e1', borderRadius: 6, padding: '2px 6px', outline: 'none' }}
+                      />
+                      <button onClick={saveNextVisitDate} style={{ fontSize: 10, padding: '2px 8px', border: 'none', borderRadius: 6, background: '#0d9488', color: '#fff', cursor: 'pointer', fontWeight: 600 }}>Save</button>
+                      <button onClick={() => setEditingNextVisit(false)} style={{ fontSize: 10, padding: '2px 6px', border: '1px solid #e2e8f0', borderRadius: 6, background: '#fff', color: '#64748b', cursor: 'pointer' }}>×</button>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: patient?.next_visit_date ? '#0f172a' : '#94a3b8', fontFamily: "'DM Mono',monospace" }}>
+                        {patient?.next_visit_date || '—'}
+                      </span>
+                      {['Doctor', 'Clinician', 'Super Admin', 'Assistant'].includes(currentUser.role) && (
+                        <button onClick={() => { setNextVisitInput(patient?.next_visit_date || ''); setEditingNextVisit(true); }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
           <div style={{ borderRadius: 10, border: '1px solid #e2e8f0', background: '#fff', padding: '10px 14px' }}>
             <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#94a3b8', marginBottom: 8 }}>App Usage</div>
             {[
-              { label: 'Language',   value: patient?.language || '—' },
+              { label: 'Language',   value: ({ en: 'English', si: 'Sinhala', ta: 'Tamil' }[enrollmentStatus?.preferred_language]) || '—' },
               { label: 'User type',  value: 'Patient' },
-              { label: 'Last active',value: lastActive },
+              { label: 'Last active',value: enrollmentStatus?.last_active_at ? new Date(enrollmentStatus.last_active_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : lastActive },
               { label: 'Check-ins',  value: `${daysWithCheckins} day${daysWithCheckins === 1 ? '' : 's'} recorded` },
             ].map(row => (
               <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 5, marginBottom: 5, borderBottom: '1px solid #f1f5f9' }}>
@@ -982,43 +1088,108 @@ const PatientDetail = () => {
         {/* Check-in history */}
         {monitoringSubTab === 'checkin' && (
           <>
+            {/* Stats */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
-              {[{ label: 'Total Check-ins', value: stats.total, bg: '#f8fafc', color: '#475569', border: '#e2e8f0' }, { label: 'GREEN', value: stats.green, bg: '#f0fdf4', color: '#16a34a', border: '#bbf7d0' }, { label: 'AMBER', value: stats.amber, bg: '#fffbeb', color: '#92400e', border: '#fde68a' }, { label: 'RED / Critical', value: stats.red, bg: '#fef2f2', color: '#dc2626', border: '#fecaca' }].map(s => (
+              {[
+                { label: 'Total Check-ins', value: stats.total, bg: '#f8fafc', color: '#475569', border: '#e2e8f0' },
+                { label: 'GREEN', value: stats.green, bg: '#f0fdf4', color: '#16a34a', border: '#bbf7d0' },
+                { label: 'AMBER', value: stats.amber, bg: '#fffbeb', color: '#92400e', border: '#fde68a' },
+                { label: 'RED / Critical', value: stats.red, bg: '#fef2f2', color: '#dc2626', border: '#fecaca' },
+              ].map(s => (
                 <div key={s.label} style={{ padding: '10px 8px', background: s.bg, border: `1px solid ${s.border}`, borderRadius: 10, textAlign: 'center' }}>
                   <div style={{ fontSize: 20, fontWeight: 800, color: s.color, lineHeight: 1.2 }}>{s.value}</div>
                   <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', color: s.color, opacity: 0.8, marginTop: 2 }}>{s.label}</div>
                 </div>
               ))}
             </div>
+
+            {/* 4-week calendar heatmap */}
+            <div style={{ borderRadius: 10, border: '1px solid #e2e8f0', background: '#fff', padding: '12px 14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#475569' }}>4-Week Overview</span>
+                  {_missedCount > 0 && (
+                    <span style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8' }}>{_missedCount} missed</span>
+                  )}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ fontSize: 9, color: '#94a3b8', fontFamily: "'DM Mono',monospace" }}>
+                    {_calStart.toLocaleDateString(undefined, { day: '2-digit', month: 'short' })} – {_calCells[_calCells.length-1]?.d.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })}
+                  </span>
+                  <button onClick={() => setCalWeeksBack(w => w + 4)} style={{ width: 22, height: 22, borderRadius: 6, border: '1px solid #e2e8f0', background: '#f8fafc', color: '#475569', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, lineHeight: 1 }}>‹</button>
+                  <button onClick={() => setCalWeeksBack(w => Math.max(0, w - 4))} disabled={!_canGoForward} style={{ width: 22, height: 22, borderRadius: 6, border: '1px solid #e2e8f0', background: _canGoForward ? '#f8fafc' : '#fafafa', color: _canGoForward ? '#475569' : '#cbd5e1', cursor: _canGoForward ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, lineHeight: 1 }}>›</button>
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3, marginBottom: 4 }}>
+                {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d => (
+                  <div key={d} style={{ fontSize: 8, fontWeight: 700, color: '#cbd5e1', textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{d}</div>
+                ))}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3 }}>
+                {_calCells.map((cell, i) => {
+                  const bg = { GREEN: '#16a34a', AMBER: '#f59e0b', RED: '#dc2626', CRITICAL: '#7f1d1d', MISSED: '#e2e8f0', outside: '#f1f5f9', future: '#f1f5f9' }[cell.status] || '#e2e8f0';
+                  const isToday = cell.key === _fmtKey(_todayMid);
+                  const isActive = ['GREEN','AMBER','RED','CRITICAL','MISSED'].includes(cell.status);
+                  const textColor = ['GREEN','AMBER','RED','CRITICAL'].includes(cell.status) ? '#fff' : cell.status === 'MISSED' ? '#64748b' : '#64748b';
+                  const tipLabel = cell.status === 'MISSED' ? 'Missed' : cell.status === 'outside' ? 'Before tracking' : cell.status === 'future' ? 'Upcoming' : cell.status;
+                  return (
+                    <div key={i}
+                      title={`${cell.d.toLocaleDateString(undefined, { day: '2-digit', month: 'short' })} — ${tipLabel}`}
+                      style={{ height: 22, borderRadius: 4, background: bg, border: isToday ? '2px solid #0d9488' : `1px solid ${isActive ? 'transparent' : '#cbd5e1'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <span style={{ fontSize: 7, fontWeight: 600, color: textColor, userSelect: 'none' }}>{cell.d.getDate()}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{ display: 'flex', gap: 12, marginTop: 8, flexWrap: 'wrap' }}>
+                {[{ bg: '#16a34a', label: 'Green' }, { bg: '#f59e0b', label: 'Amber' }, { bg: '#dc2626', label: 'Red / Critical' }, { bg: '#e2e8f0', label: 'Missed' }].map(({ bg, label }) => (
+                  <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: 2, background: bg }} />
+                    <span style={{ fontSize: 9, color: '#94a3b8' }}>{label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Daily log */}
             <div>
               <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#475569', marginBottom: 8 }}>Daily Check-in Log</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {checkins.length > 0 ? checkins.map((c, i) => {
-                  const lm = levelMeta(c.level);
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {_fullLog.length > 0 ? _fullLog.map((entry, i) => {
+                  if (entry._type === 'missed') {
+                    return (
+                      <div key={`missed-${entry._dateKey}`} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 12px', borderRadius: 8, background: '#f8fafc', border: '1px dashed #e2e8f0' }}>
+                        <span style={{ fontSize: 8, fontWeight: 700, textTransform: 'uppercase', padding: '2px 6px', borderRadius: 6, background: '#e2e8f0', color: '#94a3b8', flexShrink: 0, letterSpacing: '0.04em' }}>MISSED</span>
+                        <span style={{ fontSize: 11, fontWeight: 500, color: '#94a3b8' }}>{entry.date}</span>
+                        <span style={{ fontSize: 9, color: '#cbd5e1', marginLeft: 'auto', fontStyle: 'italic' }}>No check-in recorded</span>
+                      </div>
+                    );
+                  }
+                  const lm = levelMeta(entry.level);
                   const isOpen = expandedCheckin === i;
                   return (
-                    <div key={i} style={{ borderRadius: 10, border: `1px solid ${c.level === 'CRITICAL' ? '#fecaca' : c.level === 'RED' ? '#fed7aa' : c.level === 'AMBER' ? '#fde68a' : '#bbf7d0'}`, background: c.level === 'CRITICAL' ? '#fff1f2' : c.level === 'RED' ? '#fff7ed' : c.level === 'AMBER' ? '#fffbeb' : '#f0fdf4', overflow: 'hidden' }}>
+                    <div key={`ck-${entry.id || i}`} style={{ borderRadius: 8, border: '1px solid #f1f5f9', borderLeft: `3px solid ${lm.bg}`, background: '#fff', overflow: 'hidden' }}>
                       <div onClick={() => setExpandedCheckin(isOpen ? null : i)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', cursor: 'pointer' }}>
-                        <span style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', padding: '2px 8px', borderRadius: 10, background: lm.bg, color: lm.text, flexShrink: 0 }}>{lm.label}</span>
+                        <span style={{ fontSize: 8, fontWeight: 800, textTransform: 'uppercase', padding: '2px 7px', borderRadius: 6, background: lm.bg, color: lm.text, flexShrink: 0 }}>{lm.label}</span>
                         <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: '#0f172a' }}>{c.date}</div>
-                          <div style={{ fontSize: 9, color: '#94a3b8', fontFamily: "'DM Mono',monospace" }}>{c.time} · Score: {c.score}</div>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: '#0f172a' }}>{entry.date}</div>
+                          <div style={{ fontSize: 9, color: '#94a3b8', fontFamily: "'DM Mono',monospace" }}>{entry.time} · Score: {entry.score}</div>
                         </div>
-                        {c.note && <span style={{ fontSize: 9, color: '#64748b', fontStyle: 'italic', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.note}</span>}
-                        <span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 4 }}>{isOpen ? '▲' : '▼'}</span>
+                        {entry.note && <span style={{ fontSize: 9, color: '#64748b', fontStyle: 'italic', maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.note}</span>}
+                        <span style={{ fontSize: 11, color: '#cbd5e1', marginLeft: 4 }}>{isOpen ? '▲' : '▼'}</span>
                       </div>
                       {isOpen && (
-                        <div style={{ padding: '0 12px 10px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', borderTop: '1px solid rgba(0,0,0,0.06)' }}>
-                          {[{ q: 'Headache', a: c.headache }, { q: 'Seizure', a: c.seizure }, { q: 'Energy', a: c.energy }, { q: 'Nausea', a: c.nausea }, { q: 'Medication', a: c.medication }, { q: 'Overall', a: c.overall }].map(({ q, a }) => (
+                        <div style={{ padding: '0 12px 10px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', borderTop: '1px solid #f8fafc' }}>
+                          {[{ q: 'Headache', a: entry.headache }, { q: 'Seizure', a: entry.seizure }, { q: 'Energy', a: entry.energy }, { q: 'Nausea', a: entry.nausea }, { q: 'Medication', a: entry.medication }, { q: 'Overall', a: entry.overall }].map(({ q, a }) => (
                             <div key={q} style={{ paddingTop: 6 }}>
                               <div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>{q}</div>
                               <div style={{ fontSize: 11, fontWeight: 600, color: '#334155' }}>{a}</div>
                             </div>
                           ))}
-                          {c.note && (
+                          {entry.note && (
                             <div style={{ gridColumn: '1 / -1', paddingTop: 6 }}>
                               <div style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>Patient Note</div>
-                              <div style={{ fontSize: 11, color: '#334155', fontStyle: 'italic' }}>{c.note}</div>
+                              <div style={{ fontSize: 11, color: '#334155', fontStyle: 'italic' }}>{entry.note}</div>
                             </div>
                           )}
                         </div>
@@ -1036,30 +1207,112 @@ const PatientDetail = () => {
         )}
 
         {/* Emergency alerts */}
-        {monitoringSubTab === 'emergency' && (
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#dc2626', marginBottom: 8 }}>
-              Emergency Alerts
-              <span style={{ background: '#dc2626', color: '#fff', fontSize: 9, fontWeight: 800, padding: '1px 6px', borderRadius: 10, marginLeft: 6 }}>{alerts.length}</span>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {alerts.length > 0 ? alerts.map((a, i) => (
-                <div key={i} style={{ padding: '9px 12px', borderRadius: 10, border: `1px solid ${a.border}`, background: a.bg, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                  <span style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', padding: '2px 7px', borderRadius: 10, background: a.color, color: '#fff', flexShrink: 0, marginTop: 1 }}>{a.type}</span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: '#0f172a' }}>{a.symptom}</div>
-                    <div style={{ fontSize: 10, color: '#64748b', marginTop: 1 }}>{a.detail}</div>
-                    <div style={{ fontSize: 9, color: '#94a3b8', fontFamily: "'DM Mono',monospace", marginTop: 2 }}>{a.time}</div>
+        {monitoringSubTab === 'emergency' && (() => {
+          const detectSource = (msg) => {
+            const m = msg || '';
+            if (m.startsWith('Symptom report from')) return { label: 'Symptom Report', bg: '#fdf4ff', text: '#7e22ce' };
+            if (/Daily Check.in/i.test(m))             return { label: 'Daily Check-in',  bg: '#eff6ff', text: '#1d4ed8' };
+            if (/Emergency alert from.*GPS/i.test(m)) return { label: 'GPS Emergency',   bg: '#fff7ed', text: '#c2410c' };
+            if (/Emergency alert from/i.test(m))      return { label: 'Emergency Alert', bg: '#fff7ed', text: '#c2410c' };
+            return                                           { label: 'Chat Message',     bg: '#f1f5f9', text: '#475569' };
+          };
+
+          const parseEmergencyMsg = (raw) => {
+            const parts = (raw || '').split(' | ');
+            const fields = {};
+            let title = '';
+            parts.forEach((p, idx) => {
+              if (idx === 0) { title = p; return; }
+              const sep = p.indexOf(':');
+              if (sep > -1) {
+                const k = p.slice(0, sep).trim();
+                const v = p.slice(sep + 1).trim().replace(/\.$/, '');
+                if (k && v) fields[k] = v;
+              }
+            });
+            const isFreeText = parts.length === 1;
+            return { title, fields, isFreeText };
+          };
+
+          const fieldOrder = ['Type', 'Symptom', 'Severity', 'Started', 'Location', 'Ambulance requested', 'Note'];
+          const severityColor = (s) => {
+            const sl = (s || '').toLowerCase();
+            if (sl === 'severe' || sl === 'critical') return { bg: '#4c0519', text: '#fff' };
+            if (sl === 'moderate') return { bg: '#b45309', text: '#fff' };
+            if (sl === 'mild') return { bg: '#f59e0b', text: '#1c1917' };
+            return { bg: '#64748b', text: '#fff' };
+          };
+
+          return (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+                <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#dc2626' }}>Emergency Alerts</span>
+                <span style={{ background: '#dc2626', color: '#fff', fontSize: 9, fontWeight: 800, padding: '1px 6px', borderRadius: 10 }}>{alerts.length}</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {alerts.length > 0 ? (monitoringAlerts || []).map((raw, i) => {
+                  const { title, fields, isFreeText } = parseEmergencyMsg(raw.message);
+                  const dt = raw.created_at ? new Date(raw.created_at) : null;
+                  const dateStr = dt ? dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+                  const timeStr = dt ? dt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '';
+                  const alertType = raw.emergency ? 'EMERGENCY' : 'ALERT';
+                  const source = detectSource(raw.message);
+                  const sev = fields['Severity'];
+                  const sevStyle = sev ? severityColor(sev) : null;
+                  const orderedFields = fieldOrder.filter(k => fields[k] !== undefined);
+                  const otherFields = Object.keys(fields).filter(k => !fieldOrder.includes(k) && k !== 'Please review immediately in the web dashboard');
+
+                  return (
+                    <div key={i} style={{ borderRadius: 14, border: '1px solid #fecaca', background: '#fff', overflow: 'hidden' }}>
+                      {/* Card header */}
+                      <div style={{ background: '#fef2f2', borderBottom: '1px solid #fecaca', padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', padding: '2px 8px', borderRadius: 8, background: '#dc2626', color: '#fff' }}>{alertType}</span>
+                          <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 8px', borderRadius: 8, background: source.bg, color: source.text }}>{source.label}</span>
+                          {sev && (
+                            <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', padding: '2px 8px', borderRadius: 8, background: sevStyle.bg, color: sevStyle.text }}>{sev}</span>
+                          )}
+                          {fields['Ambulance requested'] === 'Yes' && (
+                            <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 8px', borderRadius: 8, background: '#7f1d1d', color: '#fef2f2' }}>Ambulance</span>
+                          )}
+                        </div>
+                        <span style={{ fontSize: 10, fontWeight: 600, color: '#ef4444', fontFamily: "'DM Mono',monospace", whiteSpace: 'nowrap' }}>
+                          {dateStr}{timeStr ? ` · ${timeStr}` : ''}
+                        </span>
+                      </div>
+
+                      {/* Card body */}
+                      <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {/* Title row */}
+                        <div style={{ fontSize: 12, fontWeight: 700, color: '#7f1d1d' }}>{title}</div>
+
+                        {/* Structured fields */}
+                        {!isFreeText && (orderedFields.length > 0 || otherFields.length > 0) && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                            {[...orderedFields, ...otherFields].filter(k => k !== 'Severity' && !(k === 'Ambulance requested' && fields[k] === 'Yes')).map(k => (
+                              <div key={k} style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+                                <span style={{ fontSize: 10, fontWeight: 700, color: '#dc2626', minWidth: 80, flexShrink: 0, paddingTop: 1 }}>{k}</span>
+                                <span style={{ fontSize: 11, color: '#1e293b', fontWeight: 500 }}>{fields[k]}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                      </div>
+                    </div>
+                  );
+                }) : (
+                  <div style={{ padding: '14px 12px', borderRadius: 10, border: '1px dashed #e2e8f0', background: '#fff', color: '#64748b', fontSize: 12 }}>
+                    No emergency alerts for this patient.
                   </div>
-                </div>
-              )) : (
-                <div style={{ padding: '14px 12px', borderRadius: 10, border: '1px dashed #e2e8f0', background: '#fff', color: '#64748b', fontSize: 12 }}>
-                  No emergency alerts for this patient.
-                </div>
-              )}
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Symptom reports — non-emergency new symptoms submitted from mobile */}
         {monitoringSubTab === 'symptom_report' && (
@@ -1144,7 +1397,7 @@ const PatientDetail = () => {
             setChatLoading(true);
           }
 
-          const emergencyCount = chatHistory.filter(m => m.emergency).length;
+          const emergencyCount = chatHistory.filter(m => m.emergency && !/^Emergency alert from/i.test(m.user_message || '')).length;
 
           const TOPIC_CONFIG = {
             emergency: { label: 'Emergency', bg: '#fef2f2', text: '#dc2626', border: '#fecaca' },
@@ -1304,45 +1557,25 @@ const PatientDetail = () => {
           );
         })()}
 
-        {/* Timeline */}
-        {monitoringSubTab === 'timeline' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {checkins.length > 0 ? [...checkins].reverse().map((c, i) => {
-              const lm = levelMeta(c.level);
-              return (
-                <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
-                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: lm.bg, marginTop: 4 }} />
-                    {i < checkins.length - 1 && <div style={{ width: 2, flex: 1, minHeight: 24, background: '#e2e8f0', marginTop: 2 }} />}
-                  </div>
-                  <div style={{ flex: 1, paddingBottom: 10 }}>
-                    <div style={{ fontSize: 9, color: '#94a3b8', fontFamily: "'DM Mono',monospace", marginBottom: 2 }}>{c.date} · {c.time}</div>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: '#0f172a' }}>
-                      <span style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', padding: '1px 6px', borderRadius: 8, background: lm.bg, color: lm.text, marginRight: 6 }}>{lm.label}</span>
-                      Score {c.score} · {c.overall}
-                    </div>
-                    {c.note && <div style={{ fontSize: 10, color: '#64748b', fontStyle: 'italic', marginTop: 2 }}>{c.note}</div>}
-                  </div>
-                </div>
-              );
-            }) : (
-              <div style={{ fontSize: 12, color: '#64748b', padding: '8px 0' }}>
-                No check-ins found for this patient.
-              </div>
-            )}
-          </div>
-        )}
-
         {/* Medication adherence */}
         {monitoringSubTab === 'medication' && (() => {
-          const { medications: meds, logs, days: numDays } = medAdherence;
+          const { medications: meds, logs } = medAdherence;
           const todayStr = new Date().toISOString().slice(0, 10);
-          const dates = [];
-          for (let i = numDays - 1; i >= 0; i--) {
-            const d = new Date(); d.setDate(d.getDate() - i);
-            dates.push(d.toISOString().slice(0, 10));
-          }
+          const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+          const slotName = s => ({ '08:00':'Morning','12:00':'Noon','13:00':'Afternoon','18:00':'Evening','21:00':'Night' }[s] || s);
           const takenSet = new Set((logs || []).map(l => `${l.plan_id}-${l.med_index}-${l.slot}-${l.taken_date}`));
+          const buildWindow = (daysBack) => {
+            const arr = [];
+            for (let i = daysBack + 13; i >= daysBack; i--) {
+              const d = new Date(); d.setDate(d.getDate() - i);
+              arr.push(d.toISOString().slice(0, 10));
+            }
+            return arr;
+          };
+          const fmtRange = (dates) => {
+            const fmt = d => new Date(d + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+            return `${fmt(dates[0])} – ${fmt(dates[dates.length - 1])}`;
+          };
 
           if (!meds || meds.length === 0) {
             return (
@@ -1357,19 +1590,20 @@ const PatientDetail = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               {/* Legend */}
               <div style={{ display: 'flex', gap: 14, fontSize: 10, color: '#64748b', alignItems: 'center', flexWrap: 'wrap', padding: '6px 10px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
-                {[['#16a34a','Taken'],['#dc2626','Missed'],['#fbbf24','Today (pending)'],['#e2e8f0','Upcoming']].map(([bg, label]) => (
+                {[['#16a34a', null, 'Taken'], ['#fca5a5', '#f87171', 'Missed'], ['#fef08a', '#fbbf24', 'Today (pending)'], ['#f1f5f9', '#e2e8f0', 'Upcoming']].map(([bg, border, label]) => (
                   <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <span style={{ width: 10, height: 10, borderRadius: 2, background: bg, display: 'inline-block', flexShrink: 0 }} />
+                    <span style={{ width: 12, height: 12, borderRadius: 3, background: bg, border: `1px solid ${border || bg}`, display: 'inline-block', flexShrink: 0 }} />
                     {label}
                   </span>
                 ))}
-                <span style={{ marginLeft: 'auto', color: '#94a3b8', fontStyle: 'italic' }}>Last {numDays} days</span>
+                <span style={{ marginLeft: 'auto', color: '#94a3b8', fontStyle: 'italic' }}>Last 14 days</span>
               </div>
 
               {meds.map((med, mi) => {
-                // Adherence % = taken / (past slots + today taken)
+                const daysBack = medOffsets[mi] || 0;
+                const window14 = buildWindow(daysBack);
                 let totalSlots = 0, takenCount = 0;
-                dates.forEach(d => {
+                window14.forEach(d => {
                   (med.slots || []).forEach(slot => {
                     const key = `${med.plan_id}-${med.med_index}-${slot}-${d}`;
                     if (d <= todayStr) { totalSlots++; if (takenSet.has(key)) takenCount++; }
@@ -1377,10 +1611,23 @@ const PatientDetail = () => {
                 });
                 const pct = totalSlots > 0 ? Math.round((takenCount / totalSlots) * 100) : null;
                 const pctColor = pct === null ? '#94a3b8' : pct >= 80 ? '#16a34a' : pct >= 50 ? '#f59e0b' : '#dc2626';
+                const atPresent = daysBack === 0;
+                const navBtn = (disabled, onClick, dir) => (
+                  <button onClick={onClick} disabled={disabled} style={{
+                    width: 26, height: 26, borderRadius: 6, border: '1px solid #e2e8f0',
+                    background: disabled ? '#f8fafc' : '#fff', color: disabled ? '#cbd5e1' : '#475569',
+                    cursor: disabled ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      {dir === 'left' ? <polyline points="15 18 9 12 15 6"/> : <polyline points="9 18 15 12 9 6"/>}
+                    </svg>
+                  </button>
+                );
 
                 return (
-                  <div key={mi} style={{ borderRadius: 12, border: '1px solid #e2e8f0', background: '#fff', padding: '14px 16px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                  <div key={mi} style={{ borderRadius: 12, border: '1px solid #e2e8f0', background: '#fff', padding: '14px 16px', overflow: 'hidden' }}>
+                    {/* Med header */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
                       <div>
                         <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>{med.name}</div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3, flexWrap: 'wrap' }}>
@@ -1393,50 +1640,95 @@ const PatientDetail = () => {
                         </div>
                         <div style={{ fontSize: 9, color: '#94a3b8', marginTop: 3 }}>Plan: {med.plan_title}</div>
                       </div>
-                      {pct !== null && (
-                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                          <div style={{ fontSize: 22, fontWeight: 800, color: pctColor, lineHeight: 1 }}>{pct}%</div>
-                          <div style={{ fontSize: 9, color: '#94a3b8', marginTop: 2 }}>adherence</div>
-                          <div style={{ fontSize: 9, color: '#cbd5e1' }}>{takenCount}/{totalSlots} doses</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
+                        {pct !== null && (
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontSize: 22, fontWeight: 800, color: pctColor, lineHeight: 1 }}>{pct}%</div>
+                            <div style={{ fontSize: 9, color: '#94a3b8', marginTop: 2 }}>adherence</div>
+                            <div style={{ fontSize: 9, color: '#cbd5e1' }}>{takenCount}/{totalSlots} doses</div>
+                          </div>
+                        )}
+                        {/* Navigation */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          {navBtn(false, () => setMedOffsets(p => ({ ...p, [mi]: daysBack + 14 })), 'left')}
+                          <span style={{ fontSize: 10, color: '#64748b', whiteSpace: 'nowrap', minWidth: 110, textAlign: 'center' }}>
+                            {fmtRange(window14)}
+                          </span>
+                          {navBtn(atPresent, () => setMedOffsets(p => ({ ...p, [mi]: Math.max(0, daysBack - 14) })), 'right')}
                         </div>
-                      )}
+                      </div>
                     </div>
 
                     {(med.slots || []).length === 0 ? (
                       <div style={{ fontSize: 11, color: '#94a3b8' }}>No reminder times set for this medication.</div>
-                    ) : (med.slots || []).map((slot, si) => {
-                      const slotLabel = slot === '08:00' ? 'Morning' : slot === '21:00' ? 'Night' : slot;
-                      return (
-                        <div key={si} style={{ marginTop: si > 0 ? 10 : 0 }}>
-                          <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#94a3b8', marginBottom: 5 }}>
-                            {slotLabel} · {slot}
-                          </div>
-                          <div style={{ display: 'flex', gap: 3, flexWrap: 'nowrap', overflowX: 'auto' }}>
-                            {dates.map((d, di) => {
-                              const key = `${med.plan_id}-${med.med_index}-${slot}-${d}`;
-                              const isTaken = takenSet.has(key);
-                              const isPast  = d < todayStr;
-                              const isToday = d === todayStr;
-                              const bg = isTaken ? '#16a34a' : isPast ? '#dc2626' : isToday ? '#fbbf24' : '#e2e8f0';
-                              const dayNum = new Date(d + 'T12:00:00').getDate();
-                              return (
-                                <div key={di} title={`${d}: ${isTaken ? 'Taken' : isPast ? 'Missed' : isToday ? 'Today' : 'Upcoming'}`}
-                                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, flexShrink: 0 }}>
-                                  <div style={{ width: 12, height: 12, borderRadius: 3, background: bg }} />
-                                  {(di === 0 || di === dates.length - 1 || dayNum === 1) && (
-                                    <div style={{ fontSize: 7, color: '#cbd5e1', fontFamily: "'DM Mono',monospace", whiteSpace: 'nowrap' }}>{dayNum}</div>
-                                  )}
+                    ) : (
+                      <div style={{ overflowX: 'auto' }}>
+                        {/* Day-of-week + date header */}
+                        <div style={{ display: 'flex', alignItems: 'flex-end', marginBottom: 8, paddingLeft: 86 }}>
+                          {window14.map((d, di) => {
+                            const dt = new Date(d + 'T12:00:00');
+                            const isToday = d === todayStr;
+                            const isWeekend = dt.getDay() === 0 || dt.getDay() === 6;
+                            return (
+                              <div key={di} style={{ width: 32, flexShrink: 0, textAlign: 'center', marginRight: di === 6 ? 10 : 3 }}>
+                                <div style={{ fontSize: 8, fontWeight: 600, textTransform: 'uppercase', color: isToday ? '#0d9488' : isWeekend ? '#94a3b8' : '#cbd5e1' }}>
+                                  {DOW[dt.getDay()].slice(0, 2)}
                                 </div>
-                              );
-                            })}
-                          </div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 1 }}>
-                            <span style={{ fontSize: 8, color: '#cbd5e1', fontFamily: "'DM Mono',monospace" }}>{dates[0]}</span>
-                            <span style={{ fontSize: 8, color: '#cbd5e1', fontFamily: "'DM Mono',monospace" }}>{dates[dates.length - 1]}</span>
-                          </div>
+                                <div style={{ fontSize: 11, fontWeight: isToday ? 800 : 500, color: isToday ? '#0d9488' : '#64748b', lineHeight: 1.2 }}>
+                                  {dt.getDate()}
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
-                      );
-                    })}
+
+                        {/* Slot rows */}
+                        {(med.slots || []).map((slot, si) => (
+                          <div key={si} style={{ display: 'flex', alignItems: 'center', marginTop: si > 0 ? 8 : 0 }}>
+                            {/* Slot label */}
+                            <div style={{ width: 86, flexShrink: 0, paddingRight: 10 }}>
+                              <div style={{ fontSize: 10, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{slotName(slot)}</div>
+                              <div style={{ fontSize: 9, color: '#94a3b8', fontFamily: "'DM Mono',monospace", marginTop: 1 }}>{slot}</div>
+                            </div>
+
+                            {/* Cells */}
+                            <div style={{ display: 'flex', alignItems: 'center' }}>
+                              {window14.map((d, di) => {
+                                const key = `${med.plan_id}-${med.med_index}-${slot}-${d}`;
+                                const isTaken = takenSet.has(key);
+                                const isPast  = d < todayStr;
+                                const isToday = d === todayStr;
+                                let bg, border;
+                                if (isTaken)       { bg = '#16a34a'; border = '#15803d'; }
+                                else if (isToday)  { bg = '#fef08a'; border = '#fbbf24'; }
+                                else if (isPast)   { bg = '#fca5a5'; border = '#f87171'; }
+                                else               { bg = '#f1f5f9'; border = '#e2e8f0'; }
+                                const status = isTaken ? 'Taken' : isToday ? 'Pending' : isPast ? 'Missed' : 'Upcoming';
+                                return (
+                                  <div key={di} title={`${d}: ${status}`} style={{
+                                    width: 32, height: 30, borderRadius: 7, flexShrink: 0,
+                                    background: bg, border: `1px solid ${border}`,
+                                    marginRight: di === 6 ? 10 : 3,
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  }}>
+                                    {isTaken && (
+                                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round">
+                                        <polyline points="20 6 9 17 4 12"/>
+                                      </svg>
+                                    )}
+                                    {isPast && !isTaken && (
+                                      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                                      </svg>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               })}
