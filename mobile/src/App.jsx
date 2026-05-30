@@ -25,9 +25,9 @@ import ReminderBanner from './screens/ReminderBanner'
 /* Routes that show the bottom navigation bar */
 const NAV_ROUTES = new Set(['/home', '/checkin', '/chat', '/education', '/report'])
 
-/* Redirect already-logged-in users away from auth screens */
+/* Redirect already-logged-in users away from auth screens — only on device, not localhost demo */
 function AuthRedirect({ element }) {
-  if (localStorage.getItem('mobile_token')) {
+  if (localStorage.getItem('mobile_token') && window.location.hostname !== 'localhost') {
     return <Navigate to="/home" replace />
   }
   return element
