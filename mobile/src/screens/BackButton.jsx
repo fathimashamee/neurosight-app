@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 
 const STYLES = {
   glass: {
@@ -15,6 +16,7 @@ const STYLES = {
 
 export default function BackButton({ variant = 'glass', to, onClick }) {
   const navigate = useNavigate()
+  const { t } = useTranslation()
 
   function handleClick() {
     if (onClick) { onClick(); return }
@@ -48,7 +50,7 @@ export default function BackButton({ variant = 'glass', to, onClick }) {
         transition:              'opacity 0.12s',
       }}
     >
-      ← Back
+      ← {t('common.back')}
     </button>
   )
 }

@@ -1,6 +1,6 @@
 import smtplib
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -174,7 +174,7 @@ def verify_enrollment_token(token: str, db: Session = Depends(get_db)):
     if enrollment and enrollment.status == "sent":
         enrollment.status = "active"
         if not enrollment.first_login_at:
-            enrollment.first_login_at = datetime.utcnow()
+            enrollment.first_login_at = datetime.now(timezone.utc)
         db.commit()
 
     return {
@@ -226,4 +226,7 @@ def get_enrollment_status(
         "send_method": enrollment.send_method,
         "enrolled_at": enrollment.enrolled_at.isoformat() if enrollment.enrolled_at else None,
         "first_login_at": enrollment.first_login_at.isoformat() if enrollment.first_login_at else None,
+        "last_active_at": enrollment.last_active_at.isoformat() if enrollment.last_active_at else None,
+        "preferred_language": enrollment.preferred_language,
+        "reminder_time": enrollment.reminder_time,
     }

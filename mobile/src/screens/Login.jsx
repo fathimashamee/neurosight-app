@@ -49,7 +49,7 @@ export default function Login() {
     try {
       const endpoint = role === 'patient' ? '/mobile/login' : '/mobile/caretaker-login'
       const body = role === 'patient'
-        ? { hospital_id: patientId.trim().toUpperCase() }
+        ? { hospital_id: patientId.trim().toUpperCase(), language: localStorage.getItem('language') || 'en' }
         : { hospital_id: patientId.trim().toUpperCase(), phone: phone.trim() }
 
       const res = await fetch(
@@ -73,7 +73,7 @@ export default function Login() {
       } else {
         localStorage.removeItem('mobile_caretaker')
       }
-      navigate(localStorage.getItem(`setup_done_${data.patient.hospital_id}`) ? '/home' : '/setup')
+      navigate(localStorage.getItem(`setup_done_${data.patient.hospital_id}`) ? '/home' : '/setup', { replace: true })
     } catch {
       setError(tk.error)
     } finally {

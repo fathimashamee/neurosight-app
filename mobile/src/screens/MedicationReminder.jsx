@@ -125,7 +125,7 @@ export default function MedicationReminder() {
       `}</style>
 
       {/* ── Header ── */}
-      <div style={{ background: 'linear-gradient(135deg,#4c1d95 0%,#6d28d9 55%,#7c3aed 100%)', padding: '52px 20px 32px', position: 'relative', overflow: 'hidden' }}>
+      <div style={{ background: 'linear-gradient(135deg,#4c1d95 0%,#6d28d9 55%,#7c3aed 100%)', padding: '76px 20px 40px', position: 'relative', overflow: 'hidden' }}>
         <div style={{ position: 'absolute', top: -40, right: -40, width: 150, height: 150, borderRadius: '50%', background: 'rgba(255,255,255,0.07)', animation: 'float 7s ease-in-out infinite', pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', bottom: -28, left: -28, width: 100, height: 100, borderRadius: '50%', background: 'rgba(255,255,255,0.05)', animation: 'float 9s ease-in-out infinite 2s', pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', top: 60, right: 70, width: 55, height: 55, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', animation: 'floatSlow 6s ease-in-out infinite 1s', pointerEvents: 'none' }} />
@@ -137,7 +137,7 @@ export default function MedicationReminder() {
         </div>
 
         <button className="back-btn" onClick={() => navigate('/home')}
-          style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.28)', borderRadius: 10, color: '#fff', padding: '7px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 22, backdropFilter: 'blur(8px)' }}>
+          style={{ position: 'absolute', top: 14, left: 16, background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.28)', borderRadius: 10, color: '#fff', padding: '7px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, backdropFilter: 'blur(8px)' }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><polyline points="15 18 9 12 15 6" /></svg>
           {t('medReminder.back')}
         </button>
