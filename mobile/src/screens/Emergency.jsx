@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { api } from '../api'
 import BackButton from './BackButton'
 
@@ -88,17 +89,20 @@ function AmbulanceIcon() {
   )
 }
 
+// label/severity = English strings for backend alert messages
+// labelKey/severityKey = i18n keys for UI display
 const EMERGENCY_TYPES = [
-  { key: 'seizure', label: 'Seizure', icon: BoltIcon, severity: 'Critical' },
-  { key: 'headache', label: 'Severe headache', icon: BrainPulseIcon, severity: 'High' },
-  { key: 'vomiting', label: 'Repeated vomiting', icon: StomachIcon, severity: 'High' },
-  { key: 'vision', label: 'Blurred vision', icon: EyeIcon, severity: 'High' },
-  { key: 'collapse', label: 'Loss of consciousness', icon: WarningPersonIcon, severity: 'Critical' },
-  { key: 'other', label: 'Other urgent issue', icon: AmbulanceIcon, severity: 'High' },
+  { key: 'seizure',  label: 'Seizure',               labelKey: 'emergency.typeSeizure',  icon: BoltIcon,          severity: 'Critical', severityKey: 'emergency.severityCritical' },
+  { key: 'headache', label: 'Severe headache',        labelKey: 'emergency.typeHeadache', icon: BrainPulseIcon,    severity: 'High',     severityKey: 'emergency.severityHigh' },
+  { key: 'vomiting', label: 'Repeated vomiting',      labelKey: 'emergency.typeVomiting', icon: StomachIcon,       severity: 'High',     severityKey: 'emergency.severityHigh' },
+  { key: 'vision',   label: 'Blurred vision',          labelKey: 'emergency.typeVision',   icon: EyeIcon,           severity: 'High',     severityKey: 'emergency.severityHigh' },
+  { key: 'collapse', label: 'Loss of consciousness',   labelKey: 'emergency.typeCollapse', icon: WarningPersonIcon, severity: 'Critical', severityKey: 'emergency.severityCritical' },
+  { key: 'other',    label: 'Other urgent issue',      labelKey: 'emergency.typeOther',    icon: AmbulanceIcon,     severity: 'High',     severityKey: 'emergency.severityHigh' },
 ]
 
 export default function Emergency() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const patient = useMemo(() => {
     try {
       return JSON.parse(localStorage.getItem('mobile_patient') || '{}')
@@ -110,7 +114,7 @@ export default function Emergency() {
     if (patient.name && patient.name !== 'Debug Patient') {
       return patient.name
     }
-    return patient.hospital_id ? `ID ${patient.hospital_id}` : 'Assigned patient'
+    return patient.hospital_id ? `ID ${patient.hospital_id}` : t('emergency.assignedPatient')
   }, [patient.hospital_id, patient.name])
 
   const [selected, setSelected] = useState('seizure')
@@ -137,7 +141,7 @@ export default function Emergency() {
 
   function useLiveLocation() {
     if (!navigator.geolocation) {
-      setError('Live location is not available on this device.')
+      setError(t('emergency.locationUnavailable'))
       return
     }
     setError('')
@@ -149,10 +153,7 @@ export default function Emergency() {
         setLocationLoading(false)
       },
       err => {
-        const message = err?.code === 1
-          ? 'Location permission was denied. Please enable it and try again.'
-          : 'Unable to read live location. You can type it manually instead.'
-        setError(message)
+        setError(err?.code === 1 ? t('emergency.locationDenied') : t('emergency.locationError'))
         setLocationLoading(false)
       },
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 },
@@ -163,7 +164,7 @@ export default function Emergency() {
     const type = EMERGENCY_TYPES.find(item => item.key === selected)
     const finalDescription = description.trim()
     if (!finalDescription && selected === 'other') {
-      setError('Please add a short description of the emergency.')
+      setError(t('emergency.descRequired'))
       return
     }
 
@@ -185,7 +186,7 @@ export default function Emergency() {
       })
       setSent(true)
     } catch {
-      setError('Unable to send the emergency alert. Please try again or call 1990 now.')
+      setError(t('emergency.sendError'))
     } finally {
       setLoading(false)
     }
@@ -196,9 +197,9 @@ export default function Emergency() {
       <div style={{ minHeight: '100vh', background: 'linear-gradient(180deg, #fff5f5 0%, #fff 100%)', fontFamily: "'DM Sans', sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
         <div style={{ width: '100%', maxWidth: 420, background: '#fff', borderRadius: 28, padding: 28, textAlign: 'center', boxShadow: '0 20px 60px rgba(185,28,28,0.14)', border: '1px solid #fda4af' }}>
           <div style={{ width: 88, height: 88, borderRadius: 28, margin: '0 auto', background: '#fff1f2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 42, color: '#b91c1c', border: '1px solid #fecaca' }}>✅</div>
-          <div style={{ marginTop: 16, fontSize: 22, fontWeight: 900, color: '#7f1d1d' }}>Emergency alert sent</div>
-          <div style={{ marginTop: 8, fontSize: 14, color: '#7f1d1d', lineHeight: 1.7 }}>The clinician dashboard has been notified and the case is now visible in the emergency alerts feed.</div>
-          <div style={{ marginTop: 14, display: 'inline-flex', alignItems: 'center', gap: 8, borderRadius: 999, padding: '8px 12px', background: '#fff1f2', color: '#b91c1c', fontSize: 12, fontWeight: 800, border: '1px solid #fecaca' }}>Returning to home screen…</div>
+          <div style={{ marginTop: 16, fontSize: 22, fontWeight: 900, color: '#7f1d1d' }}>{t('emergency.sentTitle')}</div>
+          <div style={{ marginTop: 8, fontSize: 14, color: '#7f1d1d', lineHeight: 1.7 }}>{t('emergency.sentSub')}</div>
+          <div style={{ marginTop: 14, display: 'inline-flex', alignItems: 'center', gap: 8, borderRadius: 999, padding: '8px 12px', background: '#fff1f2', color: '#b91c1c', fontSize: 12, fontWeight: 800, border: '1px solid #fecaca' }}>{t('emergency.sentReturning')}</div>
         </div>
       </div>
     )
@@ -216,13 +217,13 @@ export default function Emergency() {
               <EmergencyMarkIcon />
             </div>
             <div>
-              <div style={{ fontSize: 24, fontWeight: 900, lineHeight: 1.15 }}>Emergency SOS</div>
-              <div style={{ fontSize: 13, opacity: 0.9, marginTop: 8, lineHeight: 1.6, maxWidth: 360 }}>Send symptoms, live location, and support details to the clinician dashboard.</div>
+              <div style={{ fontSize: 24, fontWeight: 900, lineHeight: 1.15 }}>{t('emergency.title')}</div>
+              <div style={{ fontSize: 13, opacity: 0.9, marginTop: 8, lineHeight: 1.6, maxWidth: 360 }}>{t('emergency.subheader')}</div>
             </div>
           </div>
           <div style={{ marginTop: 16, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <div style={{ borderRadius: 999, background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.16)', padding: '8px 12px', fontSize: 12, fontWeight: 900 }}>Priority: {activeType?.severity || 'High'}</div>
-            <div style={{ borderRadius: 999, background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.16)', padding: '8px 12px', fontSize: 12, fontWeight: 800, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Patient: {patientLabel}</div>
+            <div style={{ borderRadius: 999, background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.16)', padding: '8px 12px', fontSize: 12, fontWeight: 900 }}>{t('emergency.priority', { severity: t(activeType?.severityKey || 'emergency.severityHigh') })}</div>
+            <div style={{ borderRadius: 999, background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.16)', padding: '8px 12px', fontSize: 12, fontWeight: 800, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t('emergency.patient', { name: patientLabel })}</div>
           </div>
         </div>
 
@@ -230,8 +231,8 @@ export default function Emergency() {
           <div style={{ background: '#fff', borderRadius: 24, padding: 18, border: '1px solid #f3d1d1', boxShadow: '0 16px 36px rgba(185,28,28,0.08)' }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 900, color: '#b91c1c' }}>Emergency type</div>
-                <div style={{ fontSize: 12, color: '#7f1d1d', marginTop: 4, lineHeight: 1.5 }}>Choose the closest match for faster triage.</div>
+                <div style={{ fontSize: 13, fontWeight: 900, color: '#b91c1c' }}>{t('emergency.typeLabel')}</div>
+                <div style={{ fontSize: 12, color: '#7f1d1d', marginTop: 4, lineHeight: 1.5 }}>{t('emergency.typeSub')}</div>
               </div>
             </div>
 
@@ -262,8 +263,8 @@ export default function Emergency() {
                       <item.icon />
                     </div>
                     <div style={{ minWidth: 0, width: '100%' }}>
-                      <div style={{ fontSize: 15, fontWeight: 500, color: '#0f172a', lineHeight: 1.3 }}>{item.label}</div>
-                      <div style={{ marginTop: 4, fontSize: 12, color: '#6b7280', fontWeight: 500 }}>{item.severity}</div>
+                      <div style={{ fontSize: 15, fontWeight: 500, color: '#0f172a', lineHeight: 1.3 }}>{t(item.labelKey)}</div>
+                      <div style={{ marginTop: 4, fontSize: 12, color: '#6b7280', fontWeight: 500 }}>{t(item.severityKey)}</div>
                     </div>
                   </button>
                 )
@@ -272,31 +273,31 @@ export default function Emergency() {
 
             <div style={{ marginTop: 16, display: 'grid', gap: 16 }}>
               <div style={{ width: '100%' }}>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 800, color: '#b91c1c', marginBottom: 6 }}>Symptoms</label>
-                <div style={{ marginBottom: 6, fontSize: 12, color: '#7f1d1d', lineHeight: 1.5 }}>Example: severe headache, vomiting, blurred vision, or seizure</div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 800, color: '#b91c1c', marginBottom: 6 }}>{t('emergency.symptomsLabel')}</label>
+                <div style={{ marginBottom: 6, fontSize: 12, color: '#7f1d1d', lineHeight: 1.5 }}>{t('emergency.symptomsExample')}</div>
                 <textarea
                   value={description}
                   onChange={e => setDescription(e.target.value)}
-                  placeholder="Enter symptoms"
+                  placeholder={t('emergency.symptomsPlaceholder')}
                   rows={4}
                   style={{ width: '90%', borderRadius: 16, border: '1px solid #f3d1d1', background: '#fffdfd', color: '#7f1d1d', padding: '12px 14px', fontSize: 14, outline: 'none', resize: 'vertical', fontFamily: "'DM Sans', sans-serif", lineHeight: 1.6 }}
                 />
               </div>
 
               <div style={{ width: '100%' }}>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 800, color: '#b91c1c', marginBottom: 6 }}>Location</label>
-                <div style={{ marginBottom: 6, fontSize: 12, color: '#7f1d1d', lineHeight: 1.5 }}>Home, hospital ward, or GPS coordinates</div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 800, color: '#b91c1c', marginBottom: 6 }}>{t('emergency.locationLabel')}</label>
+                <div style={{ marginBottom: 6, fontSize: 12, color: '#7f1d1d', lineHeight: 1.5 }}>{t('emergency.locationSub')}</div>
                 <input
                   value={location}
                   onChange={e => setLocation(e.target.value)}
-                  placeholder="Enter location"
+                  placeholder={t('emergency.locationPlaceholder')}
                   style={{ width: '90%', borderRadius: 16, border: '1px solid #f3d1d1', background: '#fffdfd', color: '#7f1d1d', padding: '12px 14px', fontSize: 14, outline: 'none', fontFamily: "'DM Sans', sans-serif" }}
                 />
               </div>
 
               <div style={{ display: 'flex', gap: 10, marginTop: 2 }}>
                 <button type="button" onClick={useLiveLocation} disabled={locationLoading} style={{ flex: 1, minHeight: 50, borderRadius: 14, border: '1px solid #f3d1d1', background: '#fff1f2', color: '#b91c1c', padding: '14px 14px', fontSize: 13, fontWeight: 900, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: locationLoading ? 0.8 : 1 }}>
-                  {locationLoading ? 'Getting location…' : 'Use live location'}
+                  {locationLoading ? t('emergency.gettingLocation') : t('emergency.useLiveLocation')}
                 </button>
                 <button
                   type="button"
@@ -310,13 +311,13 @@ export default function Emergency() {
                   style={{ flex: 1, minHeight: 50, borderRadius: 14, background: '#b91c1c', color: '#fff', padding: '14px 14px', fontSize: 13, fontWeight: 900, textAlign: 'center', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
                 >
                   <PhoneIcon />
-                  Call 1990
+                  {t('emergency.call1990')}
                 </button>
               </div>
 
               <label style={{ display: 'flex', alignItems: 'center', gap: 10, color: '#7f1d1d', fontSize: 13, fontWeight: 800 }}>
                 <input type="checkbox" checked={ambulance} onChange={e => setAmbulance(e.target.checked)} />
-                Ambulance support
+                {t('emergency.ambulanceLabel')}
               </label>
 
               {error && (
@@ -327,10 +328,10 @@ export default function Emergency() {
 
               <div style={{ display: 'flex', gap: 10 }}>
                 <button onClick={() => navigate('/home')} style={{ flex: 1, minHeight: 50, borderRadius: 14, border: '1px solid #d1d5db', background: '#fff', color: '#7f1d1d', padding: '12px 12px', fontSize: 14, fontWeight: 900, cursor: 'pointer' }}>
-                  Cancel
+                  {t('emergency.cancel')}
                 </button>
                 <button onClick={submitEmergency} disabled={loading} style={{ flex: 1, minHeight: 50, borderRadius: 14, border: 'none', background: '#b91c1c', color: '#fff', padding: '12px 12px', fontSize: 14, fontWeight: 900, cursor: 'pointer', opacity: loading ? 0.85 : 1 }}>
-                  {loading ? 'Sending…' : 'Send SOS'}
+                  {loading ? t('emergency.sending') : t('emergency.sendSOS')}
                 </button>
               </div>
             </div>
